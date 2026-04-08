@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="教養ポイント">
+<meta name="theme-color" content="#1C1C1E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>教養ポイント</title>
+<style>
+  html,body,#root{margin:0;padding:0;height:100%;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','Hiragino Sans',sans-serif}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// localStorage wrapper (replaces Claude's window.storage)
+async function _sg(k){try{const v=localStorage.getItem(k);return v?{value:v}:null;}catch(e){return null;}}
+async function _ss(k,v){try{localStorage.setItem(k,v);return{key:k,value:v};}catch(e){return null;}}
+async function _sd(k){try{localStorage.removeItem(k);return{key:k,deleted:true};}catch(e){return null;}}
+
+// Register service worker
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+</script>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useMemo}=React;
+const {LineChart,Line,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,RadarChart,Radar,PolarGrid,PolarAngleAxis}=Recharts;
+
+
+
+
+/* ═══════════════════════════════
+   Default Config (user-editable)
+   ═══════════════════════════════ */
+const DEFAULT_MEMBERS = ["伊藤 佑亮", "榎嶋 孝之", "菊池 智成", "森本 航平"];
+const DEFAULT_APP_NAME = "教養ポイント";
+const CATEGORIES = ["映画", "ドラマ", "アニメ", "本", "漫画"];
+const LANGUAGES = ["日本語", "英語", "韓国語", "中国語", "その他"];
+const MEDIUMS = ["劇場公開", "配信", "TV放送", "紙書籍", "電子書籍", "オーディオブック"];
+
+const POINT_RATES = {
+  映画: { rate: 3, unit: "本", label: "3pt/作品" },
+  ドラマ: { rate: 0.5, unit: "話", label: "0.5pt/話" },
+  アニメ: { rate: 0.5, unit: "話", label: "0.5pt/話" },
+  本: { rate: 0.04, unit: "頁", label: "4pt/100頁" },
+  漫画: { rate: 1, unit: "巻", label: "1pt/巻" },
+};
+
+const INTERESTS = [
+  "アクション","SF","ファンタジー","ミステリー","恋愛","コメディ","ホラー",
+  "歴史","経済","ビジネス","自己啓発","哲学","科学","社会","政治",
+  "スポーツ","音楽","アート","心理学","テクノロジー",
+  "小説","エッセイ","ノンフィクション","伝記","少年漫画","青年漫画",
+];
+
+const CC = { 映画:"#FF3B30", ドラマ:"#30D158", アニメ:"#007AFF", 本:"#FF9F0A", 漫画:"#BF5AF2" };
+const CE = { 映画:"🎬", ドラマ:"📺", アニメ:"🎨", 本:"📖", 漫画:"📚" };
+const RANK_C = ["#FFD700","#C0C0C0","#CD7F32","#8E8E93","#8E8E93","#8E8E93","#8E8E93","#8E8E93"];
+const PALETTE = ["#007AFF","#FF9500","#34C759","#AF52DE","#FF3B30","#5AC8FA","#FF2D55","#FFCC00","#30D158","#FF6482"];
+const fn = (m) => m.split(" ")[0];
+const cp = (cat, cnt) => Math.round(cnt * POINT_RATES[cat].rate * 100) / 100;
+const rl = (v) => v <= 30 ? "人を選ぶ" : v <= 70 ? "普通におすすめ" : "強くおすすめ";
+const rc = (v) => v <= 30 ? "#FF3B30" : v <= 70 ? "#FF9500" : "#34C759";
+
+const PERIODS = [
+  { key:"all", label:"全期間" },{ key:"12m", label:"12ヶ月" },
+  { key:"3m", label:"3ヶ月" },{ key:"ytd", label:"年初来" },
+];
+
+const LOGO_L = "data:image/webp;base64,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";
+const LOGO_D = LOGO_L; // Same logo — works on dark header
+
+/* ═══ 称号 ═══ */
+const TITLES = [
+  { min:0, name:"見習い", emoji:"🌱" },{ min:15, name:"教養入門者", emoji:"📗" },
+  { min:30, name:"教養の芽", emoji:"🌿" },{ min:50, name:"教養戦士", emoji:"⚔️" },
+  { min:80, name:"知の探究者", emoji:"🔭" },{ min:120, name:"教養マスター", emoji:"🎓" },
+  { min:200, name:"ニホンカモシカ", emoji:"🦌" },{ min:250, name:"カモノハシ", emoji:"🦆" },
+  { min:300, name:"ソクラテス", emoji:"🏛️" },{ min:350, name:"フクロウ博士", emoji:"🦉" },
+  { min:400, name:"ダ・ヴィンチ", emoji:"🎨" },{ min:450, name:"ユニコーン", emoji:"🦄" },
+  { min:500, name:"コペルニクス", emoji:"🌍" },{ min:550, name:"不死鳥", emoji:"🔥" },
+  { min:600, name:"ニュートン", emoji:"🍎" },{ min:650, name:"ドラゴン", emoji:"🐉" },
+  { min:700, name:"シェイクスピア", emoji:"🎭" },{ min:750, name:"ガリレオ", emoji:"🔬" },
+  { min:800, name:"テスラ", emoji:"⚡" },{ min:900, name:"レオナルド", emoji:"👑" },
+  { min:1000, name:"GOAT 🐐 アインシュタイン", emoji:"🧠" },
+];
+function getTitle(pts) {
+  let t = TITLES[0];
+  for (const x of TITLES) { if (pts >= x.min) t = x; }
+  const nx = TITLES.find((x) => x.min > pts);
+  return { ...t, next: nx, progress: nx ? (pts - t.min) / (nx.min - t.min) : 1 };
+}
+function diagnoseType(byC, total) {
+  if (total === 0) return { emoji:"⚖️", name:"バランス教養人" };
+  const r = {}; CATEGORIES.forEach((c) => { r[c] = Math.round(((byC[c]||0)/total)*100); });
+  if ((r.映画+r.ドラマ)>60) return { emoji:"🎬", name:"シネマフリーク" };
+  if (r.本>45) return { emoji:"📚", name:"知識の求道者" };
+  if ((r.アニメ+r.漫画)>40) return { emoji:"🎨", name:"カルチャーオタク" };
+  return { emoji:"⚖️", name:"バランス教養人" };
+}
+
+/* ═══ 独自レコメンドエンジン v2 ═══ */
+const CATALOG = [
+  // 映画 — 日本語
+  {title:"ショーシャンクの空に",category:"映画",tags:["ドラマ","名作","感動"],lang:"日本語",medium:"配信",count:1},
+  {title:"インターステラー",category:"映画",tags:["SF","科学"],lang:"英語",medium:"配信",count:1},
+  {title:"パラサイト 半地下の家族",category:"映画",tags:["社会","ミステリー"],lang:"韓国語",medium:"配信",count:1},
+  {title:"千と千尋の神隠し",category:"映画",tags:["ファンタジー","アート"],lang:"日本語",medium:"配信",count:1},
+  {title:"ダークナイト",category:"映画",tags:["アクション","哲学"],lang:"英語",medium:"配信",count:1},
+  {title:"マトリックス",category:"映画",tags:["SF","アクション","哲学"],lang:"英語",medium:"配信",count:1},
+  {title:"ウルフ・オブ・ウォールストリート",category:"映画",tags:["ビジネス","経済"],lang:"英語",medium:"配信",count:1},
+  {title:"ソーシャル・ネットワーク",category:"映画",tags:["ビジネス","テクノロジー"],lang:"英語",medium:"配信",count:1},
+  {title:"オッペンハイマー",category:"映画",tags:["歴史","科学"],lang:"英語",medium:"劇場公開",count:1},
+  {title:"万引き家族",category:"映画",tags:["社会","小説"],lang:"日本語",medium:"配信",count:1},
+  {title:"グリーンブック",category:"映画",tags:["歴史","コメディ"],lang:"英語",medium:"配信",count:1},
+  {title:"パルプ・フィクション",category:"映画",tags:["アクション","コメディ"],lang:"英語",medium:"配信",count:1},
+  // ドラマ
+  {title:"ブレイキング・バッド",category:"ドラマ",tags:["ミステリー","心理学"],lang:"英語",medium:"配信",count:62},
+  {title:"ゲーム・オブ・スローンズ",category:"ドラマ",tags:["ファンタジー","歴史","アクション"],lang:"英語",medium:"配信",count:73},
+  {title:"THE LAST OF US",category:"ドラマ",tags:["SF","アクション"],lang:"英語",medium:"配信",count:9},
+  {title:"SHOGUN 将軍",category:"ドラマ",tags:["歴史","アクション"],lang:"英語",medium:"配信",count:10},
+  {title:"梨泰院クラス",category:"ドラマ",tags:["ビジネス","恋愛"],lang:"韓国語",medium:"配信",count:16},
+  {title:"愛の不時着",category:"ドラマ",tags:["恋愛","コメディ"],lang:"韓国語",medium:"配信",count:16},
+  {title:"半沢直樹",category:"ドラマ",tags:["ビジネス","社会"],lang:"日本語",medium:"TV放送",count:10},
+  {title:"アンナチュラル",category:"ドラマ",tags:["ミステリー","科学"],lang:"日本語",medium:"TV放送",count:10},
+  // アニメ
+  {title:"進撃の巨人",category:"アニメ",tags:["アクション","哲学","SF"],lang:"日本語",medium:"配信",count:87},
+  {title:"鬼滅の刃",category:"アニメ",tags:["アクション","ファンタジー"],lang:"日本語",medium:"配信",count:44},
+  {title:"STEINS;GATE",category:"アニメ",tags:["SF","ミステリー","科学"],lang:"日本語",medium:"配信",count:24},
+  {title:"葬送のフリーレン",category:"アニメ",tags:["ファンタジー","哲学"],lang:"日本語",medium:"配信",count:28},
+  {title:"推しの子",category:"アニメ",tags:["ミステリー","社会"],lang:"日本語",medium:"配信",count:23},
+  {title:"ヴァイオレット・エヴァーガーデン",category:"アニメ",tags:["アート","小説"],lang:"日本語",medium:"配信",count:13},
+  {title:"モブサイコ100",category:"アニメ",tags:["アクション","コメディ","自己啓発"],lang:"日本語",medium:"配信",count:37},
+  // 本
+  {title:"サピエンス全史",category:"本",tags:["歴史","科学","哲学"],lang:"日本語",medium:"紙書籍",count:500},
+  {title:"FACTFULNESS",category:"本",tags:["科学","社会","ノンフィクション"],lang:"英語",medium:"紙書籍",count:400},
+  {title:"嫌われる勇気",category:"本",tags:["哲学","自己啓発","心理学"],lang:"日本語",medium:"紙書籍",count:296},
+  {title:"銃・病原菌・鉄",category:"本",tags:["歴史","科学","社会"],lang:"日本語",medium:"紙書籍",count:600},
+  {title:"影響力の武器",category:"本",tags:["心理学","ビジネス"],lang:"英語",medium:"紙書籍",count:450},
+  {title:"三体",category:"本",tags:["SF","科学","小説"],lang:"中国語",medium:"紙書籍",count:550},
+  {title:"コンビニ人間",category:"本",tags:["小説","社会"],lang:"日本語",medium:"紙書籍",count:180},
+  {title:"夜と霧",category:"本",tags:["哲学","歴史","ノンフィクション"],lang:"その他",medium:"紙書籍",count:200},
+  {title:"金持ち父さん 貧乏父さん",category:"本",tags:["経済","ビジネス"],lang:"英語",medium:"電子書籍",count:350},
+  {title:"Atomic Habits",category:"本",tags:["自己啓発","心理学"],lang:"英語",medium:"電子書籍",count:320},
+  {title:"Range",category:"本",tags:["科学","自己啓発","ビジネス"],lang:"英語",medium:"電子書籍",count:380},
+  // 漫画
+  {title:"チェンソーマン",category:"漫画",tags:["アクション","ホラー","少年漫画"],lang:"日本語",medium:"紙書籍",count:16},
+  {title:"ブルーロック",category:"漫画",tags:["スポーツ","少年漫画"],lang:"日本語",medium:"紙書籍",count:28},
+  {title:"ゴールデンカムイ",category:"漫画",tags:["歴史","アクション","コメディ"],lang:"日本語",medium:"紙書籍",count:31},
+  {title:"ハイキュー!!",category:"漫画",tags:["スポーツ","少年漫画"],lang:"日本語",medium:"紙書籍",count:45},
+  {title:"宇宙兄弟",category:"漫画",tags:["科学","自己啓発","青年漫画"],lang:"日本語",medium:"紙書籍",count:42},
+  {title:"SPY×FAMILY",category:"漫画",tags:["アクション","コメディ"],lang:"日本語",medium:"電子書籍",count:13},
+];
+
+function recommend(member, entries, interests, wishlist, dismissed, filterCat, filterLang) {
+  const me = entries.filter((e) => e.member === member);
+  const allTitles = new Set(entries.map((e) => e.title));
+  const wishTitles = new Set((wishlist || []).map((w) => w.title));
+  const dSet = new Set(dismissed || []);
+
+  const myTags = {};
+  me.forEach((e) => { (e.tags || []).forEach((t) => { myTags[t] = (myTags[t]||0) + (e.rating >= 4 ? 3 : e.rating >= 3 ? 1 : 0); }); });
+  (interests || []).forEach((i) => { myTags[i] = (myTags[i]||0) + 5; });
+
+  const othersHigh = {};
+  entries.filter((e) => e.member !== member && e.rating >= 4 && e.recommendation >= 60).forEach((e) => { othersHigh[e.title] = (othersHigh[e.title]||0) + 1; });
+
+  const catCount = {};
+  me.forEach((e) => { catCount[e.category] = (catCount[e.category]||0) + 1; });
+  const totalCat = Object.values(catCount).reduce((a,b) => a+b, 0) || 1;
+
+  let pool = CATALOG.filter((c) => !allTitles.has(c.title) && !wishTitles.has(c.title) && !dSet.has(c.title));
+  if (filterCat && filterCat !== "all") pool = pool.filter((c) => c.category === filterCat);
+  if (filterLang && filterLang !== "all") pool = pool.filter((c) => c.lang === filterLang);
+
+  return pool.map((item) => {
+    let score = 0;
+    let reasons = [];
+    const tagMatch = (item.tags||[]).filter((t) => myTags[t] > 0);
+    score += tagMatch.reduce((s,t) => s + myTags[t], 0);
+    if (tagMatch.length >= 2) reasons.push(`${tagMatch.slice(0,2).join("・")}好きにぴったり`);
+    if (othersHigh[item.title]) { score += othersHigh[item.title]*5; reasons.push("仲間が高評価"); }
+    const catRatio = (catCount[item.category]||0) / totalCat;
+    if (catRatio < 0.1) { score += 8; reasons.push(`${item.category}の新たな冒険`); }
+    const iMatch = (item.tags||[]).filter((t) => (interests||[]).includes(t));
+    if (iMatch.length > 0 && !reasons.some((r) => r.includes("ぴったり"))) { score += iMatch.length*4; reasons.push(`${iMatch[0]}に興味あり`); }
+    return { ...item, score, reason: reasons[0] || `${item.category}の名作`, match: score>=15?"high":score>=8?"medium":"low" };
+  }).sort((a,b) => b.score - a.score).slice(0, 6);
+}
+
+/* ═══ Helpers ═══ */
+function filterByPeriod(entries, period) {
+  if (period === "all") return entries;
+  const now = new Date(); let cutoff;
+  if (period === "12m") cutoff = new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+  else if (period === "3m") cutoff = new Date(now.getFullYear(), now.getMonth()-3, now.getDate());
+  else if (period === "ytd") cutoff = new Date(now.getFullYear(), 0, 1);
+  else return entries;
+  return entries.filter((e) => e.date && e.date >= cutoff.toISOString().split("T")[0]);
+}
+function calcDev(scores) {
+  if (scores.length < 2) return scores.map(() => 50);
+  const m = scores.reduce((a,b) => a+b, 0) / scores.length;
+  const sd = Math.sqrt(scores.reduce((s,x) => s+(x-m)**2, 0) / scores.length);
+  return sd === 0 ? scores.map(() => 50) : scores.map((x) => Math.round(50+10*(x-m)/sd));
+}
+
+/* ═══ Initial Data ═══ */
+const INIT = [
+  {id:"1",member:"伊藤 佑亮",title:"トップガン",category:"映画",count:1,rating:5,date:"2022-11-06",comment:"",recommendation:80,tags:["アクション"],spoiler:false},
+  {id:"2",member:"伊藤 佑亮",title:"トップガン マーベリック",category:"映画",count:1,rating:4,date:"2022-12-06",comment:"Guess you were not the one (菊池)",recommendation:75,tags:["アクション"],spoiler:false},
+  {id:"3",member:"伊藤 佑亮",title:"スラムダンク",category:"漫画",count:5,rating:3,date:"2022-06-15",comment:"",recommendation:60,tags:[],spoiler:false},
+  {id:"4",member:"伊藤 佑亮",title:"サラ金の歴史",category:"本",count:345,rating:4,date:"2022-07-29",comment:"おもろい",recommendation:70,tags:["歴史","経済"],spoiler:false},
+  {id:"5",member:"伊藤 佑亮",title:"問屋が復活する",category:"本",count:250,rating:3,date:"2022-06-27",comment:"普通",recommendation:40,tags:["ビジネス"],spoiler:false},
+  {id:"6",member:"伊藤 佑亮",title:"表彰制度",category:"本",count:220,rating:1,date:"2022-07-15",comment:"",recommendation:20,tags:["ビジネス"],spoiler:false},
+  {id:"7",member:"伊藤 佑亮",title:"ペーパーハウス",category:"ドラマ",count:6,rating:5,date:"2022-12-08",comment:"おもろいね",recommendation:90,tags:["アクション"],spoiler:false},
+  {id:"8",member:"伊藤 佑亮",title:"入門 組織開発",category:"本",count:206,rating:1,date:"2022-07-31",comment:"",recommendation:15,tags:["ビジネス"],spoiler:false},
+  {id:"9",member:"伊藤 佑亮",title:"人事管理的な本",category:"本",count:225,rating:1,date:"2022-08-13",comment:"",recommendation:15,tags:["ビジネス"],spoiler:false},
+  {id:"10",member:"伊藤 佑亮",title:"麻雀入門",category:"本",count:200,rating:0,date:"2022-08-20",comment:"古角にボロ負け",recommendation:30,tags:[],spoiler:false},
+  {id:"11",member:"伊藤 佑亮",title:"Peaky Blinders",category:"ドラマ",count:34,rating:4,date:"2022-09-01",comment:"",recommendation:80,tags:["歴史","アクション"],spoiler:false},
+  {id:"12",member:"榎嶋 孝之",title:"劇場版名探偵コナン",category:"映画",count:1,rating:4,date:"2022-10-06",comment:"",recommendation:70,tags:["ミステリー"],spoiler:false},
+  {id:"13",member:"榎嶋 孝之",title:"ドライブ・マイカー",category:"映画",count:1,rating:4,date:"2022-06-14",comment:"",recommendation:65,tags:[],spoiler:false},
+  {id:"14",member:"榎嶋 孝之",title:"コーダ",category:"映画",count:1,rating:5,date:"2022-06-16",comment:"",recommendation:95,tags:[],spoiler:false},
+  {id:"15",member:"榎嶋 孝之",title:"死刑にいたる病",category:"映画",count:1,rating:4,date:"2022-06-20",comment:"",recommendation:70,tags:["ミステリー"],spoiler:false},
+  {id:"16",member:"榎嶋 孝之",title:"キングダム2",category:"映画",count:1,rating:4,date:"2022-07-28",comment:"",recommendation:70,tags:["アクション","歴史"],spoiler:false},
+  {id:"17",member:"榎嶋 孝之",title:"アキラとあきら",category:"映画",count:1,rating:4,date:"2022-08-31",comment:"",recommendation:70,tags:["ビジネス"],spoiler:false},
+  {id:"18",member:"菊池 智成",title:"ロッキー",category:"映画",count:1,rating:4,date:"2022-12-06",comment:"",recommendation:75,tags:["アクション"],spoiler:false},
+  {id:"19",member:"菊池 智成",title:"スパイファミリー",category:"アニメ",count:10,rating:5,date:"2022-06-10",comment:"",recommendation:90,tags:["アクション","コメディ"],spoiler:false},
+  {id:"20",member:"菊池 智成",title:"アヴァランチ",category:"ドラマ",count:10,rating:5,date:"2022-06-12",comment:"",recommendation:85,tags:[],spoiler:false},
+  {id:"21",member:"森本 航平",title:"Obi-Wan Kenobi",category:"ドラマ",count:6,rating:4,date:"2022-06-20",comment:"1~4普通、5えぐおもろい、6そこそこ良かった",recommendation:65,tags:["SF","アクション"],spoiler:true},
+  {id:"22",member:"森本 航平",title:"志高く",category:"本",count:484,rating:4,date:"2022-07-20",comment:"偉人すぎて草",recommendation:80,tags:["ビジネス","自己啓発"],spoiler:false},
+  {id:"23",member:"森本 航平",title:"Peaky Blinders",category:"ドラマ",count:36,rating:4,date:"2022-08-15",comment:"聞き取れん→聞き取れるようになってきた→真似できるようになってきた",recommendation:85,tags:["歴史","アクション"],spoiler:false},
+  {id:"24",member:"森本 航平",title:"Batman Begins",category:"映画",count:1,rating:4,date:"2022-08-20",comment:"メンツえぐ",recommendation:75,tags:["アクション"],spoiler:false},
+];
+
+/* ═══ Components ═══ */
+function CatPill({cat}){ return <span style={{display:"inline-block",padding:"2px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:CC[cat]+"22",color:CC[cat],border:`1px solid ${CC[cat]}40`}}>{cat}</span>; }
+function RatingDisplay({value}){ const n=Math.round(value||0); return <span style={{fontSize:11,color:"#FF9500"}}>{"★".repeat(n)}{"☆".repeat(5-n)} {(value||0).toFixed(1)}</span>; }
+function TagChips({tags}){ if(!tags?.length)return null; return <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>{tags.map((t)=><span key={t} style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:"var(--tag-bg)",color:"var(--tag-fg)",fontWeight:600}}>#{t}</span>)}</div>; }
+function BookSpine({entry,onClick,idx}){ const c=CC[entry.category]; const h=90+(entry.title.length%5)*10; return <div onClick={onClick} className="bsp" style={{width:36,height:h,borderRadius:"3px 6px 6px 3px",cursor:"pointer",background:`linear-gradient(180deg,${c},${c}AA)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`2px 2px 8px ${c}40`,borderLeft:`3px solid ${c}CC`,animation:`si .5s ease ${idx*.03}s both`}}><div style={{writingMode:"vertical-rl",textOrientation:"mixed",fontSize:9,fontWeight:700,color:"#fff",overflow:"hidden",maxHeight:h-14,padding:"6px 2px",textShadow:"0 1px 2px rgba(0,0,0,.4)"}}>{entry.title.length>8?entry.title.slice(0,8)+"…":entry.title}</div></div>; }
+function ChartTip({active,payload,label}){ if(!active||!payload?.length)return null; return <div style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:12,padding:"12px 16px",boxShadow:"0 8px 24px rgba(0,0,0,.12)",fontSize:12}}><div style={{fontWeight:700,marginBottom:8,color:"var(--text)"}}>{label}</div>{payload.map((p)=><div key={p.dataKey} style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,color:"var(--text)"}}><span style={{width:10,height:10,borderRadius:5,background:p.color,display:"inline-block"}}/><span style={{color:"var(--sub)",flex:1}}>{fn(p.dataKey)}</span><span style={{fontWeight:700}}>{p.value}pt</span></div>)}</div>; }
+function buildTimeline(entries,members){const s=entries.filter((e)=>e.date).sort((a,b)=>a.date.localeCompare(b.date));if(!s.length)return[];const ms=[...new Set(s.map((e)=>e.date.slice(0,7)))].sort();const c={};members.forEach((m)=>{c[m]=0;});return ms.map((ym)=>{s.filter((e)=>e.date.slice(0,7)===ym).forEach((e)=>{c[e.member]=(c[e.member]||0)+cp(e.category,e.count);});const r={month:ym.replace("-","/")};members.forEach((m)=>{r[m]=Math.round((c[m]||0)*10)/10;});return r;});}
+
+/* ═══ CSS ═══ */
+const CSS=`*{box-sizing:border-box;margin:0;padding:0}@keyframes su{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}@keyframes fi{from{opacity:0}to{opacity:1}}@keyframes si{from{opacity:0;transform:scaleY(0)}to{opacity:1;transform:scaleY(1)}}.cd{background:var(--card);border-radius:16px;box-shadow:var(--cs);animation:su .4s ease both;transition:background .3s}.bt{border:none;cursor:pointer;font-family:inherit;transition:all .2s}.bt:active{transform:scale(.97)}.rh{transition:background .15s}.rh:hover{background:var(--hover)!important}input,select,textarea{font-family:inherit;outline:none;border:1.5px solid var(--ib);border-radius:12px;padding:10px 14px;font-size:15px;background:var(--ig);color:var(--text);transition:all .2s}input:focus,select:focus,textarea:focus{border-color:#007AFF;box-shadow:0 0 0 3px rgba(0,122,255,.15)}.bk{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(12px);z-index:100;animation:fi .2s}.ml{position:fixed;bottom:0;left:0;right:0;max-height:92vh;background:var(--card);border-radius:20px 20px 0 0;z-index:101;animation:su .3s;overflow-y:auto;padding:28px 24px 40px;-webkit-overflow-scrolling:touch}@media(min-width:600px){.ml{top:50%;bottom:auto;left:50%;right:auto;transform:translate(-50%,-50%);max-width:520px;width:92%;border-radius:20px}}.sg{padding:7px 12px;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .2s;white-space:nowrap}.sg-a{background:#007AFF;color:#fff;box-shadow:0 2px 8px rgba(0,122,255,.3)}.sg-i{background:transparent;color:rgba(255,255,255,.45)}.sg-i:hover{color:#fff;background:rgba(255,255,255,.08)}.pb{height:6px;border-radius:3px;background:var(--bb);overflow:hidden}.pf{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.25,.46,.45,.94)}.bsp{transition:transform .2s}.bsp:hover{transform:translateY(-4px)!important}.rslider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(90deg,#D1D1D6,#FF9500)}.rslider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:11px;background:#FF9500;cursor:pointer}.rcslider{-webkit-appearance:none;width:100%;height:6px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(90deg,#FF3B30,#FF9500 50%,#34C759)}.rcslider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:11px;background:#007AFF;cursor:pointer}.shelf{display:flex;align-items:flex-end;gap:4px;padding:12px 16px;min-height:130px;background:var(--shbg);border-radius:12px;border-bottom:4px solid rgba(0,0,0,.12);overflow-x:auto}.psel{font-size:11px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:#fff;cursor:pointer;-webkit-appearance:none}.devbox{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;color:#fff}`;
+
+/* ═══ MAIN APP ═══ */
+function App() {
+  const [entries, setEntries] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
+  const [profiles, setProfiles] = useState({});
+  const [config, setConfig] = useState({ members: DEFAULT_MEMBERS, appName: DEFAULT_APP_NAME });
+  const [loading, setLoading] = useState(true);
+  const [dark, setDark] = useState(() => typeof window!=="undefined"&&window.matchMedia?window.matchMedia("(prefers-color-scheme:dark)").matches:false);
+  const [view, setView] = useState("dashboard");
+  const [selMem, setSelMem] = useState(null);
+  const [period, setPeriod] = useState("all");
+  const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [detE, setDetE] = useState(null);
+  const [animIn, setAnimIn] = useState(false);
+  const [recMem, setRecMem] = useState("");
+  const [recs, setRecs] = useState([]);
+  const [dismissed, setDismissed] = useState([]);
+  const [recCatFilter, setRecCatFilter] = useState("all");
+  const [recLangFilter, setRecLangFilter] = useState("all");
+  const [newMember, setNewMember] = useState("");
+  const [form, setForm] = useState({member:"",title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});
+  const [wishForm, setWishForm] = useState({title:"",category:"映画",member:"",note:""});
+  const [showWishForm, setShowWishForm] = useState(false);
+  const [showGovInfo, setShowGovInfo] = useState(false);
+
+  const members = config.members;
+  const appName = config.appName;
+
+  // Member colors (dynamic)
+  const getMC = useCallback((m) => { const idx = members.indexOf(m); return PALETTE[idx % PALETTE.length]; }, [members]);
+  const getMI = useCallback((m) => m ? m.charAt(0) : "?", []);
+
+  useEffect(()=>{if(typeof window!=="undefined"&&window.matchMedia){const mq=window.matchMedia("(prefers-color-scheme:dark)");const h=(e)=>setDark(e.matches);mq.addEventListener("change",h);return()=>mq.removeEventListener("change",h);}},[]);
+
+  useEffect(()=>{(async()=>{
+    try{
+      const c=await _sg("kyouyou-config-v1"); if(c?.value) setConfig(JSON.parse(c.value));
+      const r=await _sg("kyouyou-v7"); if(r?.value) setEntries(JSON.parse(r.value)); else{setEntries(INIT);await _ss("kyouyou-v7",JSON.stringify(INIT));}
+      const w=await _sg("kyouyou-wish-v3"); if(w?.value) setWishlist(JSON.parse(w.value));
+      const p=await _sg("kyouyou-profiles-v2"); if(p?.value) setProfiles(JSON.parse(p.value));
+    }catch{setEntries(INIT);}
+    setLoading(false);setTimeout(()=>setAnimIn(true),50);
+  })();},[]);
+
+  const save=useCallback(async(n)=>{setEntries(n);try{await _ss("kyouyou-v7",JSON.stringify(n));}catch{}},[]);
+  const saveWish=useCallback(async(n)=>{setWishlist(n);try{await _ss("kyouyou-wish-v3",JSON.stringify(n));}catch{}},[]);
+  const saveProfiles=useCallback(async(n)=>{setProfiles(n);try{await _ss("kyouyou-profiles-v2",JSON.stringify(n));}catch{}},[]);
+  const saveConfig=useCallback(async(n)=>{setConfig(n);try{await _ss("kyouyou-config-v1",JSON.stringify(n));}catch{}},[]);
+
+  const toggleInterest=(member,interest)=>{const cur=profiles[member]?.interests||[];const next=cur.includes(interest)?cur.filter((i)=>i!==interest):[...cur,interest];saveProfiles({...profiles,[member]:{...(profiles[member]||{}),interests:next}});};
+  const handleReset=async()=>{if(!confirm("全データをリセットしますか？\n（記録・積読・興味プロファイルが初期化されます）"))return;try{await _ss("kyouyou-v7",JSON.stringify(INIT));await _ss("kyouyou-wish-v3","[]");await _ss("kyouyou-profiles-v2","{}");await _sd("kyouyou-v7");await _ss("kyouyou-v7",JSON.stringify(INIT));}catch(e){/* ok */}setEntries([...INIT]);setWishlist([]);setProfiles({});setRecs([]);setDismissed([]);};
+  const handleSubmit=()=>{if(!form.title.trim())return;const{tagInput,...d}=form;if(editId){save(entries.map((e)=>e.id===editId?{...d,id:editId}:e));setEditId(null);}else{save([...entries,{...d,id:Date.now().toString()}]);}setForm({member:form.member,title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});setShowForm(false);};
+  const addTag=(t)=>{const tag=t.trim();if(tag&&!form.tags.includes(tag))setForm({...form,tags:[...form.tags,tag],tagInput:""});else setForm({...form,tagInput:""});};
+  const generateRecs=()=>{const interests=profiles[recMem]?.interests||[];setRecs(recommend(recMem,entries,interests,wishlist,dismissed,recCatFilter,recLangFilter));};
+
+  // Settings: add/remove member, change app name
+  const addMember=()=>{if(!newMember.trim()||members.includes(newMember.trim()))return;saveConfig({...config,members:[...members,newMember.trim()]});setNewMember("");};
+  const removeMember=(m)=>{if(!confirm(`${m}を削除しますか？記録は残ります。`))return;saveConfig({...config,members:members.filter((x)=>x!==m)});};
+
+  const filtered=useMemo(()=>filterByPeriod(entries,period),[entries,period]);
+  const searched=useMemo(()=>{if(!search)return filtered;const q=search.toLowerCase();return filtered.filter((e)=>e.title.toLowerCase().includes(q)||(e.tags||[]).some((t)=>t.toLowerCase().includes(q))||e.member.includes(q));},[filtered,search]);
+
+  const getStats=useCallback((m,data)=>{
+    const me=data.filter((e)=>e.member===m);const total=me.reduce((s,e)=>s+cp(e.category,e.count),0);
+    const byC={};CATEGORIES.forEach((c)=>{byC[c]=me.filter((e)=>e.category===c).reduce((s,e)=>s+cp(e.category,e.count),0);});
+    const rated=me.filter((e)=>e.rating>0);const t=Math.round(total*100)/100;
+    return{total:t,byCategory:byC,count:me.length,avgR:rated.length?rated.reduce((s,e)=>s+e.rating,0)/rated.length:0,title:getTitle(t),type:diagnoseType(byC,t),entries:me};
+  },[]);
+
+  const rankings=useMemo(()=>members.map((m)=>({member:m,...getStats(m,searched)})).sort((a,b)=>b.total-a.total),[searched,getStats,members]);
+  const deviations=useMemo(()=>{const s=rankings.map((r)=>r.total);const d=calcDev(s);return Object.fromEntries(rankings.map((r,i)=>[r.member,d[i]]));},[rankings]);
+  const timeline=useMemo(()=>buildTimeline(searched,members),[searched,members]);
+  const detail=selMem?getStats(selMem,searched):null;
+  const devColor=(d)=>d>=60?"#FF3B30":d>=55?"#FF9500":d>=45?"#007AFF":"#8E8E93";
+
+  const th=dark?{"--bg":"#000","--card":"#1C1C1E","--card2":"#2C2C2E","--hover":"#2C2C2E","--text":"#F5F5F7","--sub":"#98989D","--border":"#38383A","--cs":"0 1px 3px rgba(0,0,0,.3)","--bb":"#38383A","--shbg":"#2C2C2E","--tag-bg":"#38383A","--tag-fg":"#A1A1A6","--ig":"#2C2C2E","--ib":"#48484A"}:{"--bg":"#F2F2F7","--card":"#fff","--card2":"#F5F5F5","--hover":"#F8F8FA","--text":"#1C1C1E","--sub":"#86868B","--border":"#D1D1D6","--cs":"0 1px 3px rgba(0,0,0,.06)","--bb":"#E5E5EA","--shbg":"#E8E0D4","--tag-bg":"#F2F2F7","--tag-fg":"#636366","--ig":"#FAFAFA","--ib":"#D1D1D6"};
+
+  if(loading)return (<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:dark?"#000":"#F2F2F7",color:"#8E8E93"}}><div style={{textAlign:"center"}}><img src={dark?LOGO_D:LOGO_L} alt="" style={{width:64,height:64,borderRadius:16,marginBottom:12}}/><div>読み込み中...</div></div></div>);
+
+  const TABS=[{k:"dashboard",l:"ホーム"},{k:"shelf",l:"本棚"},{k:"charts",l:"グラフ"},{k:"entries",l:"記録"},{k:"wish",l:"📌積読"},{k:"rec",l:"🎯おすすめ"}];
+  const closeBtn=(f)=><button className="bt" onClick={f} style={{background:"var(--bb)",width:32,height:32,borderRadius:16,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--sub)",flexShrink:0}}>✕</button>;
+  const lbl=(t)=><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",marginBottom:6,display:"block"}}>{t}</label>;
+
+  return(
+    <div style={{...th,fontFamily:"-apple-system,BlinkMacSystemFont,'Helvetica Neue','Hiragino Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",paddingBottom:100,opacity:animIn?1:0,transition:"opacity .6s,background .4s,color .4s"}}>
+      <style>{CSS}</style>
+
+      {/* Header */}
+      <div style={{background:dark?"linear-gradient(135deg,#000,#1C1C1E)":"linear-gradient(135deg,#1C1C1E,#2C2C2E)",padding:"48px 24px 28px",color:"#fff"}}>
+        <div style={{maxWidth:720,margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <img src={dark?LOGO_D:LOGO_L} alt="" style={{width:40,height:40,borderRadius:10}}/>
+              <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-.02em"}}>{appName}</h1>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button className="bt" onClick={()=>setDark(!dark)} style={{background:dark?"rgba(255,200,50,.15)":"rgba(100,100,255,.15)",color:"#fff",padding:"8px 10px",borderRadius:10,fontSize:12}}>{dark?"☀️":"🌙"}</button>
+              <button className="bt" onClick={()=>setShowSettings(true)} style={{background:"rgba(255,255,255,.1)",color:"#fff",padding:"8px 10px",borderRadius:10,fontSize:12}}>⚙️</button>
+              <button className="bt" onClick={handleReset} style={{background:"rgba(255,255,255,.06)",color:"#8E8E93",padding:"8px 10px",borderRadius:10,fontSize:11}}>リセット</button>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:6}}>
+            <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="🔍 検索" style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.1)",color:"#fff",fontSize:12,padding:"7px 12px",borderRadius:10}}/>
+            <select className="psel" value={period} onChange={(e)=>setPeriod(e.target.value)}>{PERIODS.map((o)=><option key={o.key} value={o.key} style={{color:"#000"}}>{o.label}</option>)}</select>
+          </div>
+          <div style={{display:"flex",gap:3,marginTop:12,background:"rgba(255,255,255,.08)",padding:3,borderRadius:12,overflowX:"auto"}}>
+            {TABS.map((t)=><button key={t.k} className={`sg ${view===t.k?"sg-a":"sg-i"}`} onClick={()=>{setView(t.k);setSelMem(null);}}>{t.l}</button>)}
+            {members.map((m)=><button key={m} className={`sg ${view==="member"&&selMem===m?"sg-a":"sg-i"}`} onClick={()=>{setView("member");setSelMem(m);}} style={{fontSize:10}}>{fn(m)}</button>)}
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:720,margin:"0 auto",padding:"24px 16px"}}>
+
+        {/* ══ DASHBOARD ══ */}
+        {view==="dashboard"&&<div>
+          {rankings[0]?.total>0&&(()=>{const r=rankings[0];const tt=r.title;const dev=deviations[r.member];return(
+            <div className="cd" style={{padding:24,marginBottom:16,background:dark?"linear-gradient(135deg,#1C1C1E,#2A2040)":"linear-gradient(135deg,#fff,#FFF8F0)",border:`1px solid ${dark?"#38383A":"#FFD70030"}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:16}}>
+                <div style={{textAlign:"center"}}><div style={{fontSize:36}}>👑</div><div className="devbox" style={{width:40,height:40,fontSize:14,background:`linear-gradient(135deg,${devColor(dev)},${devColor(dev)}AA)`}}>{dev}</div><div style={{fontSize:9,color:"var(--sub)"}}>偏差値</div></div>
+                <div style={{flex:1}}><div style={{fontSize:12,color:"var(--sub)",fontWeight:600}}>現在1位</div><div style={{fontSize:22,fontWeight:700}}>{r.member}</div><div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#FFD70020",color:"#B8860B",fontWeight:600}}>{tt.emoji} {tt.name}</span><span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#007AFF15",color:"#007AFF",fontWeight:600}}>{r.type.emoji} {r.type.name}</span></div></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:36,fontWeight:800,background:"linear-gradient(135deg,#FFD700,#FF9500)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>{r.total.toFixed(1)}</div><div style={{fontSize:12,color:"var(--sub)"}}>pts</div></div>
+              </div>
+              {tt.next&&<div style={{marginTop:14}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--sub)",marginBottom:4}}><span>{tt.emoji} {tt.name}</span><span>次: {tt.next.emoji} {tt.next.name} ({tt.next.min}pt)</span></div><div className="pb"><div className="pf" style={{width:`${tt.progress*100}%`,background:"linear-gradient(90deg,#FFD700,#FF9500)"}}/></div></div>}
+            </div>);})()}
+          <div className="cd" style={{overflow:"hidden"}}>
+            <div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h2 style={{fontSize:16,fontWeight:700}}>ランキング</h2></div>
+            {rankings.map((r,i)=>{const mx=rankings[0]?.total||1;const dev=deviations[r.member];const mc=getMC(r.member);return(
+              <div key={r.member} className="rh" onClick={()=>{setView("member");setSelMem(r.member);}} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",borderBottom:i<rankings.length-1?"1px solid var(--border)":"none",cursor:"pointer",animation:`su .4s ease ${.05+i*.05}s both`}}>
+                <div style={{width:28,height:28,borderRadius:14,background:RANK_C[i]+(i<3?"":"40"),display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:i<3?"#fff":"var(--sub)"}}>{i+1}</div>
+                <div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}><span style={{fontSize:14,fontWeight:600}}>{r.member}</span><span style={{fontSize:10,padding:"1px 6px",borderRadius:6,background:"#FFD70018",color:"#B8860B",fontWeight:600}}>{r.title.emoji} {r.title.name}</span></div><div className="pb"><div className="pf" style={{width:`${(r.total/mx)*100}%`,background:mc}}/></div></div>
+                <div className="devbox" style={{width:34,height:34,fontSize:13,background:`linear-gradient(135deg,${devColor(dev)},${devColor(dev)}AA)`,flexShrink:0}}>{dev}</div>
+                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:18,fontWeight:700}}>{r.total.toFixed(1)}</div><div style={{fontSize:11,color:"var(--sub)"}}>{r.count}作品</div></div>
+                <div style={{color:"var(--sub)",fontSize:14}}>›</div>
+              </div>);})}
+          </div>
+          <div className="cd" style={{padding:20,marginTop:16}}>
+            <h3 style={{fontSize:15,fontWeight:700,marginBottom:16}}>🧬 教養タイプ</h3>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {rankings.map((r)=><div key={r.member} style={{padding:14,borderRadius:14,background:"var(--card2)"}}><div style={{fontSize:28,marginBottom:4}}>{r.type.emoji}</div><div style={{fontSize:13,fontWeight:700}}>{fn(r.member)}</div><div style={{fontSize:12,fontWeight:700,color:getMC(r.member)}}>{r.type.name}</div></div>)}
+            </div>
+          </div>
+
+          {/* Governance Pie Chart */}
+          {(() => {
+            const totalAll = rankings.reduce((s, r) => s + r.total, 0);
+            if (totalAll === 0) return null;
+            const pieData = [...rankings].sort((a, b) => b.total - a.total).map((r) => ({
+              name: fn(r.member),
+              fullName: r.member,
+              value: Math.round(r.total * 10) / 10,
+              pct: Math.round((r.total / totalAll) * 1000) / 10,
+              color: getMC(r.member),
+            }));
+            const thresholds = [
+              { pct: 50, label: "実質支配権", color: "#FF3B30" },
+              { pct: 33.4, label: "拒否権", color: "#FF9500" },
+              { pct: 10, label: "議案提案権", color: "#007AFF" },
+            ];
+            return (
+              <div className="cd" style={{ padding: 20, marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700 }}>📊 ポイント占有率</h3>
+                  <button className="bt" onClick={() => setShowGovInfo(!showGovInfo)} style={{ background: "var(--card2)", padding: "4px 10px", borderRadius: 8, fontSize: 12, color: "var(--sub)" }}>📖 議決権とは</button>
+                </div>
+                {showGovInfo && (
+                  <div style={{ padding: 14, background: dark ? "#2C2C2E" : "#FFF8F0", borderRadius: 12, marginBottom: 16, fontSize: 12, color: "var(--sub)", lineHeight: 1.7, border: "1px solid var(--border)" }}>
+                    <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: 6 }}>📖 議決権の閾値（参考）</div>
+                    <div><span style={{ color: "#FF3B30", fontWeight: 700 }}>●</span> 実質支配権: 50%超 — 普通決議を単独で可決</div>
+                    <div><span style={{ color: "#FF9500", fontWeight: 700 }}>●</span> 拒否権: 33.4%超 — 特別決議を単独で否決</div>
+                    <div><span style={{ color: "#007AFF", fontWeight: 700 }}>●</span> 議案提案権: 10%以上 — 議案を単独で提案</div>
+                    <div style={{ marginTop: 8, fontStyle: "italic", fontSize: 11 }}>※教養ポイントが議決権に直結していた旧ルールの名残です</div>
+                  </div>
+                )}
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" outerRadius={80} innerRadius={35} dataKey="value" startAngle={90} endAngle={-270} paddingAngle={2} strokeWidth={0}
+                      label={({ name, pct }) => `${name} ${pct}%`} labelLine={false}>
+                      {pieData.map((d, i) => (<Cell key={i} fill={d.color} />))}
+                    </Pie>
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (<div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 10, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
+                        <div style={{ fontWeight: 700, color: "var(--text)" }}>{d.fullName}</div>
+                        <div style={{ color: "var(--sub)" }}>{d.value}pt ({d.pct}%)</div>
+                      </div>);
+                    }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Members with governance badges */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+                  {pieData.map((d) => {
+                    const badges = thresholds.filter((t) => d.pct >= t.pct);
+                    return (
+                      <div key={d.fullName} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 6, background: d.color, display: "inline-block", flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{d.fullName}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{d.pct}%</span>
+                      </div>
+                    );
+                  })}
+                  {pieData.some((d) => thresholds.some((t) => d.pct >= t.pct)) && (
+                    <div style={{ marginTop: 4, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {pieData.filter((d) => thresholds.some((t) => d.pct >= t.pct)).map((d) => {
+                        const highest = thresholds.find((t) => d.pct >= t.pct);
+                        return (<span key={d.fullName} style={{ fontSize: 11, padding: "3px 10px", borderRadius: 8, background: highest.color + "18", color: highest.color, fontWeight: 600 }}>{fn(d.fullName)}: {highest.label}</span>);
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>}
+
+        {/* ══ SHELF ══ */}
+        {view==="shelf"&&<div>{members.map((m)=>{const me=searched.filter((e)=>e.member===m).sort((a,b)=>(a.date||"").localeCompare(b.date||""));return (<div key={m} className="cd" style={{padding:20,marginBottom:16}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}><h3 style={{fontSize:14,fontWeight:700}}>{m}</h3><span style={{fontSize:12,color:"var(--sub)"}}>{me.length}作品</span></div><div className="shelf">{me.map((e,i)=><BookSpine key={e.id} entry={e} idx={i} onClick={()=>setDetE(e)}/>)}{me.length===0&&<div style={{color:"var(--sub)",fontSize:13,padding:20}}>記録なし</div>}</div></div>);})}</div>}
+
+        {/* ══ CHARTS ══ */}
+        {view==="charts"&&<div>
+          <div className="cd" style={{padding:24,marginBottom:20}}><h2 style={{fontSize:16,fontWeight:700,marginBottom:16}}>ポイント推移</h2>
+            <ResponsiveContainer width="100%" height={260}><LineChart data={timeline} margin={{top:8,right:8,left:-16,bottom:0}}><XAxis dataKey="month" tick={{fontSize:10,fill:dark?"#98989D":"#86868B"}} tickLine={false} axisLine={{stroke:"var(--border)"}} interval="preserveStartEnd"/><YAxis tick={{fontSize:11,fill:dark?"#98989D":"#86868B"}} tickLine={false} axisLine={false}/><Tooltip content={<ChartTip/>}/>{members.map((m)=><Line key={m} type="monotone" dataKey={m} stroke={getMC(m)} strokeWidth={2.5} dot={{r:3,fill:dark?"#1C1C1E":"#fff",stroke:getMC(m),strokeWidth:2}} activeDot={{r:5,fill:getMC(m)}}/>)}</LineChart></ResponsiveContainer>
+            <div style={{display:"flex",justifyContent:"center",gap:14,marginTop:12,flexWrap:"wrap"}}>{members.map((m)=><div key={m} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"var(--sub)"}}><span style={{width:8,height:8,borderRadius:4,background:getMC(m),display:"inline-block"}}/>{fn(m)}</div>)}</div>
+          </div>
+          <div className="cd" style={{padding:24}}><h2 style={{fontSize:16,fontWeight:700,marginBottom:16}}>レーダー</h2>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>{rankings.map((r)=>{const rd=CATEGORIES.map((c)=>({cat:c,value:Math.round(r.byCategory[c]*10)/10}));return (<div key={r.member} style={{textAlign:"center",padding:10,borderRadius:14,background:"var(--card2)"}}><div style={{fontSize:12,fontWeight:700,marginBottom:4}}>{fn(r.member)}</div><ResponsiveContainer width="100%" height={140}><RadarChart data={rd} margin={{top:8,right:16,bottom:8,left:16}}><PolarGrid stroke="var(--border)"/><PolarAngleAxis dataKey="cat" tick={{fontSize:9,fill:"var(--sub)"}}/><Radar dataKey="value" stroke={getMC(r.member)} fill={getMC(r.member)} fillOpacity={.2} strokeWidth={2}/></RadarChart></ResponsiveContainer></div>)})}</div>
+          </div>
+        </div>}
+
+        {/* ══ ENTRIES ══ */}
+        {view==="entries"&&<div className="cd" style={{overflow:"hidden"}}>
+          <div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h2 style={{fontSize:16,fontWeight:700}}>全記録 — {searched.length}件</h2></div>
+          {[...searched].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map((e,i)=>(
+            <div key={e.id} className="rh" onClick={()=>setDetE(e)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--border)",cursor:"pointer",animation:`su .3s ease ${Math.min(i*.02,.5)}s both`}}>
+              <div style={{width:26,height:26,borderRadius:13,background:getMC(e.member)+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:getMC(e.member),flexShrink:0}}>{getMI(e.member)}</div>
+              <div style={{flex:1,minWidth:0}}><div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}><span style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.title}</span><CatPill cat={e.category}/></div><div style={{fontSize:11,color:"var(--sub)"}}>{fn(e.member)} · {e.count}{POINT_RATES[e.category].unit}{e.date?` · ${e.date}`:""}</div></div>
+              <div style={{textAlign:"right",flexShrink:0}}><RatingDisplay value={e.rating}/><div style={{fontSize:13,fontWeight:700,color:"#007AFF",marginTop:2}}>+{cp(e.category,e.count).toFixed(1)}</div></div>
+            </div>))}
+        </div>}
+
+        {/* ══ WISHLIST ══ */}
+        {view==="wish"&&<div className="cd" style={{padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}><h2 style={{fontSize:16,fontWeight:700}}>📌 積読リスト</h2><button className="bt" onClick={()=>setShowWishForm(true)} style={{background:"#007AFF",color:"#fff",padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:600}}>+ 追加</button></div>
+          {wishlist.length===0&&<div style={{textAlign:"center",padding:40,color:"var(--sub)"}}><div style={{fontSize:32,marginBottom:8}}>📚</div><div>まだ何も登録されていません</div></div>}
+          {wishlist.map((w,i)=><div key={w.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:i<wishlist.length-1?"1px solid var(--border)":"none"}}><CatPill cat={w.category}/><div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{w.title}</div>{w.note&&<div style={{fontSize:11,color:"var(--sub)"}}>{w.note}</div>}</div>
+            <button className="bt" onClick={()=>{setForm({member:w.member||members[0],title:w.title,category:w.category,count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});setEditId(null);setShowForm(true);saveWish(wishlist.filter((x)=>x.id!==w.id));}} style={{background:"#30D158",color:"#fff",padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600}}>✓ 完了</button>
+            <button className="bt" onClick={()=>saveWish(wishlist.filter((x)=>x.id!==w.id))} style={{background:"none",color:"#FF3B30",fontSize:11,fontWeight:600,padding:"5px 8px"}}>削除</button>
+          </div>)}
+        </div>}
+
+        {/* ══ RECOMMEND ══ */}
+        {view==="rec"&&<div>
+          <div className="cd" style={{padding:24,marginBottom:16}}>
+            <h2 style={{fontSize:16,fontWeight:700,marginBottom:4}}>🎯 おすすめ</h2>
+            <p style={{fontSize:11,color:"var(--sub)",marginBottom:16}}>興味プロファイル × 履歴 × 仲間の評価を独自エンジンが分析</p>
+            <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>{members.map((m)=><button key={m} className="bt" onClick={()=>{setRecMem(m);setRecs([]);}} style={{padding:"7px 14px",borderRadius:10,fontSize:12,fontWeight:600,background:recMem===m?getMC(m):"var(--card2)",color:recMem===m?"#fff":"var(--text)"}}>{fn(m)}</button>)}</div>
+
+            {recMem&&<>
+              {/* Interest profile */}
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>📋 {fn(recMem)}の興味プロファイル</div>
+                <p style={{fontSize:11,color:"var(--sub)",marginBottom:8}}>選択するほど精度UP</p>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>{INTERESTS.map((interest)=>{const sel=(profiles[recMem]?.interests||[]).includes(interest);return (<button key={interest} className="bt" onClick={()=>toggleInterest(recMem,interest)} style={{padding:"5px 12px",borderRadius:16,fontSize:11,fontWeight:600,background:sel?"#007AFF":"var(--card2)",color:sel?"#fff":"var(--sub)"}}>{sel?"✓ ":""}{interest}</button>);})}</div>
+              </div>
+
+              {/* Filters */}
+              <div style={{display:"flex",gap:10,marginBottom:16}}>
+                <div style={{flex:1}}>{lbl("カテゴリ")}<select value={recCatFilter} onChange={(e)=>setRecCatFilter(e.target.value)} style={{width:"100%",fontSize:13}}><option value="all">すべて</option>{CATEGORIES.map((c)=><option key={c} value={c}>{CE[c]} {c}</option>)}</select></div>
+                <div style={{flex:1}}>{lbl("言語")}<select value={recLangFilter} onChange={(e)=>setRecLangFilter(e.target.value)} style={{width:"100%",fontSize:13}}><option value="all">すべて</option>{LANGUAGES.map((l)=><option key={l} value={l}>{l}</option>)}</select></div>
+              </div>
+
+              <button className="bt" onClick={generateRecs} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:"14px",borderRadius:14,fontSize:15,fontWeight:700,width:"100%",boxShadow:"0 4px 16px rgba(0,122,255,.3)"}}>🎯 おすすめを生成</button>
+            </>}
+          </div>
+
+          {recs.length>0&&<div className="cd" style={{padding:20}}>
+            <h3 style={{fontSize:14,fontWeight:700,marginBottom:14}}>{fn(recMem)}さんへのおすすめ</h3>
+            {recs.map((rec,i)=>{const seen=entries.some((e)=>e.title===rec.title);const inW=wishlist.some((w)=>w.title===rec.title);return(
+              <div key={i} style={{padding:14,background:"var(--card2)",borderRadius:14,marginBottom:10,animation:`su .3s ease ${i*.08}s both`}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{fontSize:24,lineHeight:1}}>{CE[rec.category]}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                      <span style={{fontSize:14,fontWeight:700}}>{rec.title}</span>
+                      <CatPill cat={rec.category}/>
+                      {rec.match==="high"&&<span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:"#34C75920",color:"#34C759",fontWeight:600}}>高相性</span>}
+                      <span style={{fontSize:10,color:"var(--sub)"}}>{rec.lang}</span>
+                    </div>
+                    <div style={{fontSize:12,color:"var(--sub)",marginBottom:4}}>{rec.reason}</div>
+                    <TagChips tags={rec.tags}/>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,marginTop:10}}>
+                  {seen?<span style={{fontSize:11,color:"var(--sub)",fontWeight:600,padding:"5px 10px"}}>✓ 記録済み</span>:<button className="bt" onClick={()=>{setForm({member:recMem,title:rec.title,category:rec.category,count:rec.count||1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:rec.tags||[],spoiler:false,tagInput:""});setEditId(null);setShowForm(true);}} style={{background:"#30D158",color:"#fff",padding:"5px 12px",borderRadius:8,fontSize:11,fontWeight:600}}>✓ 見た！記録する</button>}
+                  {!inW&&!seen&&<button className="bt" onClick={()=>saveWish([...wishlist,{id:Date.now().toString(),title:rec.title,category:rec.category,member:recMem,note:rec.reason}])} style={{background:"#FF9500",color:"#fff",padding:"5px 12px",borderRadius:8,fontSize:11,fontWeight:600}}>📌 気になる</button>}
+                  {inW&&<span style={{fontSize:11,color:"#FF9500",fontWeight:600,padding:"5px 10px"}}>📌 積読中</span>}
+                  <button className="bt" onClick={()=>{setDismissed([...dismissed,rec.title]);setRecs(recs.filter((r)=>r.title!==rec.title));}} style={{background:"none",color:"var(--sub)",fontSize:11,padding:"5px 6px"}}>✕</button>
+                </div>
+              </div>);})}
+            <button className="bt" onClick={generateRecs} style={{marginTop:8,background:"var(--card2)",color:"#007AFF",padding:"10px",borderRadius:10,fontSize:12,fontWeight:600,width:"100%"}}>🔄 別のおすすめ</button>
+          </div>}
+        </div>}
+
+        {/* ══ MEMBER ══ */}
+        {view==="member"&&selMem&&detail&&<div>
+          <div className="cd" style={{padding:24,marginBottom:16}}>
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
+              <div style={{textAlign:"center"}}><div className="devbox" style={{width:48,height:48,fontSize:18,background:`linear-gradient(135deg,${devColor(deviations[selMem])},${devColor(deviations[selMem])}AA)`,marginBottom:4}}>{deviations[selMem]}</div><div style={{fontSize:9,color:"var(--sub)"}}>偏差値</div></div>
+              <div style={{flex:1}}><h2 style={{fontSize:20,fontWeight:700}}>{selMem}</h2><div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}><span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#FFD70020",color:"#B8860B",fontWeight:600}}>{detail.title.emoji} {detail.title.name}</span><span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#007AFF15",color:"#007AFF",fontWeight:600}}>{detail.type.emoji} {detail.type.name}</span></div><div style={{fontSize:12,color:"var(--sub)",marginTop:4}}>{detail.count}作品 · 平均 {detail.avgR.toFixed(1)}★</div></div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:30,fontWeight:800,color:getMC(selMem)}}>{detail.total.toFixed(1)}</div><div style={{fontSize:11,color:"var(--sub)"}}>pt</div></div>
+            </div>
+            {detail.title.next&&<div style={{marginBottom:16}}><div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--sub)",marginBottom:4}}><span>次: {detail.title.next.emoji} {detail.title.next.name}</span><span>あと {(detail.title.next.min-detail.total).toFixed(1)}pt</span></div><div className="pb"><div className="pf" style={{width:`${detail.title.progress*100}%`,background:"linear-gradient(90deg,#FFD700,#FF9500)"}}/></div></div>}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>{CATEGORIES.filter((c)=>detail.byCategory[c]>0).map((cat)=><div key={cat} style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:36,fontSize:11,fontWeight:600,color:CC[cat]}}>{cat}</div><div className="pb" style={{flex:1}}><div className="pf" style={{width:`${(detail.byCategory[cat]/detail.total)*100}%`,background:CC[cat]}}/></div><div style={{width:48,textAlign:"right",fontSize:12,fontWeight:600}}>{detail.byCategory[cat].toFixed(1)}</div></div>)}</div>
+          </div>
+          <div className="cd" style={{padding:20,marginBottom:16}}><h3 style={{fontSize:14,fontWeight:700,marginBottom:12}}>本棚</h3><div className="shelf">{detail.entries.sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map((e,i)=><BookSpine key={e.id} entry={e} idx={i} onClick={()=>setDetE(e)}/>)}</div></div>
+          <div className="cd" style={{overflow:"hidden"}}><div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h3 style={{fontSize:14,fontWeight:700}}>記録一覧</h3></div>
+            {detail.entries.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map((e)=>(
+              <div key={e.id} className="rh" style={{padding:"12px 20px",borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}><span style={{fontSize:14,fontWeight:600,flex:1,cursor:"pointer"}} onClick={()=>setDetE(e)}>{e.title}</span><CatPill cat={e.category}/><span style={{fontSize:14,fontWeight:700,color:getMC(selMem)}}>+{cp(e.category,e.count).toFixed(1)}</span></div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}><RatingDisplay value={e.rating}/><div style={{display:"flex",gap:6}}><button className="bt" onClick={()=>{setForm({...e,tagInput:""});setEditId(e.id);setShowForm(true);}} style={{background:"none",color:"#007AFF",fontSize:11,fontWeight:600,padding:"5px 8px",borderRadius:8}}>編集</button><button className="bt" onClick={()=>save(entries.filter((x)=>x.id!==e.id))} style={{background:"none",color:"#FF3B30",fontSize:11,fontWeight:600,padding:"5px 8px",borderRadius:8}}>削除</button></div></div>
+                <TagChips tags={e.tags}/>
+                {e.comment&&<div style={{fontSize:12,color:"var(--sub)",marginTop:6,padding:"6px 10px",background:"var(--card2)",borderRadius:10,fontStyle:"italic"}}>{e.spoiler?<details><summary style={{cursor:"pointer",color:"#FF3B30",fontWeight:600,fontStyle:"normal"}}>⚠ ネタバレ</summary><div style={{marginTop:4}}>💬 {e.comment}</div></details>:<>💬 {e.comment}</>}</div>}
+              </div>))}
+          </div>
+        </div>}
+      </div>
+
+      {/* FAB */}
+      <button className="bt" onClick={()=>{setEditId(null);setForm({member:selMem||members[0],title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});setShowForm(true);}} style={{position:"fixed",bottom:28,right:28,width:56,height:56,borderRadius:28,background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(0,122,255,.4)",zIndex:50}}>+</button>
+
+      {/* Detail Modal */}
+      {detE&&<><div className="bk" onClick={()=>setDetE(null)}/><div className="ml">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}><div style={{flex:1}}><CatPill cat={detE.category}/><h3 style={{fontSize:20,fontWeight:700,marginTop:8}}>{detE.title}</h3><div style={{fontSize:12,color:"var(--sub)",marginTop:4}}>{detE.member} · {detE.date||"日付未設定"}</div></div>{closeBtn(()=>setDetE(null))}</div>
+        <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}><div><div style={{fontSize:11,color:"var(--sub)",marginBottom:4}}>評価</div><RatingDisplay value={detE.rating}/></div><div><div style={{fontSize:11,color:"var(--sub)",marginBottom:4}}>教養pt</div><div style={{fontSize:22,fontWeight:800,color:"#007AFF"}}>{cp(detE.category,detE.count).toFixed(1)}</div></div><div><div style={{fontSize:11,color:"var(--sub)",marginBottom:4}}>推奨度</div><div style={{fontSize:16,fontWeight:700,color:rc(detE.recommendation||0)}}>{detE.recommendation||0}% {rl(detE.recommendation||0)}</div></div></div>
+        <TagChips tags={detE.tags}/>
+        {detE.comment&&<div style={{padding:12,background:"var(--card2)",borderRadius:12,fontSize:13,lineHeight:1.7,marginTop:12,marginBottom:16}}>{detE.spoiler?<details><summary style={{cursor:"pointer",color:"#FF3B30",fontWeight:600}}>⚠ ネタバレ</summary><div style={{marginTop:8}}>{detE.comment}</div></details>:detE.comment}</div>}
+        <a href={`https://www.amazon.co.jp/s?k=${encodeURIComponent(detE.title)}`} target="_blank" rel="noopener noreferrer" style={{display:"block",textAlign:"center",padding:12,background:"var(--card2)",borderRadius:12,color:"#FF9500",fontWeight:700,fontSize:13,textDecoration:"none",marginTop:12}}>🔗 Amazonで探す</a>
+      </div></>}
+
+      {/* Form Modal */}
+      {showForm&&<><div className="bk" onClick={()=>{setShowForm(false);setEditId(null);}}/><div className="ml">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}><h3 style={{fontSize:18,fontWeight:700}}>{editId?"記録を編集":"新しい記録"}</h3>{closeBtn(()=>{setShowForm(false);setEditId(null);})}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>{lbl("メンバー")}<select value={form.member} onChange={(e)=>setForm({...form,member:e.target.value})} style={{width:"100%"}}>{members.map((m)=><option key={m} value={m}>{m}</option>)}</select></div>
+          <div>{lbl("作品名")}<input value={form.title} onChange={(e)=>setForm({...form,title:e.target.value})} placeholder="タイトル" style={{width:"100%"}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div>{lbl("カテゴリ")}<select value={form.category} onChange={(e)=>setForm({...form,category:e.target.value,count:e.target.value==="映画"?1:form.count})} style={{width:"100%"}}>{CATEGORIES.map((c)=><option key={c} value={c}>{c}</option>)}</select></div><div>{lbl(POINT_RATES[form.category].unit+"数")}<input type="number" min="1" value={form.count} onChange={(e)=>setForm({...form,count:parseInt(e.target.value)||1})} style={{width:"100%"}}/></div></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,alignItems:"end"}}><div>{lbl("評価（0〜5）")}<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{color:"#FF9500"}}>{"★".repeat(Math.round(form.rating))}{"☆".repeat(5-Math.round(form.rating))}</span><span style={{fontWeight:700,color:"#FF9500"}}>{(form.rating||0).toFixed(1)}</span></div><input type="range" min="0" max="50" value={Math.round((form.rating||0)*10)} onChange={(e)=>setForm({...form,rating:parseInt(e.target.value)/10})} className="rslider"/></div><div>{lbl("完了日")}<input type="date" value={form.date} onChange={(e)=>setForm({...form,date:e.target.value})} style={{width:"100%"}}/></div></div>
+          <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",marginBottom:6,display:"flex",justifyContent:"space-between"}}><span>おすすめ度</span><span style={{color:rc(form.recommendation),fontWeight:700}}>{form.recommendation}% {rl(form.recommendation)}</span></label><input type="range" min="0" max="100" value={form.recommendation} onChange={(e)=>setForm({...form,recommendation:parseInt(e.target.value)})} className="rcslider"/></div>
+          <div>{lbl("タグ")}<div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>{form.tags.map((t)=><span key={t} style={{fontSize:11,padding:"3px 10px",borderRadius:10,background:"#007AFF18",color:"#007AFF",fontWeight:600,display:"flex",alignItems:"center",gap:4}}>#{t}<button onClick={()=>setForm({...form,tags:form.tags.filter((x)=>x!==t)})} style={{background:"none",border:"none",color:"#007AFF",cursor:"pointer",fontSize:13,padding:0}}>×</button></span>)}</div><input value={form.tagInput||""} onChange={(e)=>setForm({...form,tagInput:e.target.value})} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===","){e.preventDefault();addTag(form.tagInput);}}} placeholder="タグ入力（Enter追加）" style={{width:"100%"}}/></div>
+          <div><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><label style={{fontSize:13,fontWeight:600,color:"var(--sub)"}}>感想</label><label style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:form.spoiler?"#FF3B30":"var(--sub)",cursor:"pointer"}}><input type="checkbox" checked={form.spoiler} onChange={(e)=>setForm({...form,spoiler:e.target.checked})} style={{width:14,height:14,accentColor:"#FF3B30"}}/>⚠ ネタバレ</label></div><textarea value={form.comment} onChange={(e)=>setForm({...form,comment:e.target.value})} placeholder="感想..." rows={3} style={{width:"100%",resize:"vertical"}}/></div>
+          <div style={{background:"var(--card2)",borderRadius:12,padding:12,textAlign:"center"}}><span style={{fontSize:12,color:"var(--sub)"}}>獲得: </span><span style={{fontSize:20,fontWeight:800,color:"#007AFF"}}>{cp(form.category,form.count).toFixed(1)}</span><span style={{fontSize:12,color:"var(--sub)"}}> pt</span></div>
+          <button className="bt" onClick={handleSubmit} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:14,borderRadius:14,fontSize:16,fontWeight:700,width:"100%"}}>{editId?"更新":"📚 記録する"}</button>
+        </div>
+      </div></>}
+
+      {/* Wish Form */}
+      {showWishForm&&<><div className="bk" onClick={()=>setShowWishForm(false)}/><div className="ml">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}><h3 style={{fontSize:18,fontWeight:700}}>📌 積読に追加</h3>{closeBtn(()=>setShowWishForm(false))}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>{lbl("タイトル")}<input value={wishForm.title} onChange={(e)=>setWishForm({...wishForm,title:e.target.value})} placeholder="読みたい本・観たい映画" style={{width:"100%"}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div>{lbl("カテゴリ")}<select value={wishForm.category} onChange={(e)=>setWishForm({...wishForm,category:e.target.value})} style={{width:"100%"}}>{CATEGORIES.map((c)=><option key={c} value={c}>{c}</option>)}</select></div><div>{lbl("メンバー")}<select value={wishForm.member||members[0]} onChange={(e)=>setWishForm({...wishForm,member:e.target.value})} style={{width:"100%"}}>{members.map((m)=><option key={m} value={m}>{m}</option>)}</select></div></div>
+          <button className="bt" onClick={()=>{if(!wishForm.title.trim())return;saveWish([...wishlist,{...wishForm,member:wishForm.member||members[0],id:Date.now().toString()}]);setWishForm({title:"",category:"映画",member:members[0],note:""});setShowWishForm(false);}} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:14,borderRadius:14,fontSize:16,fontWeight:700,width:"100%"}}>📌 追加</button>
+        </div>
+      </div></>}
+
+      {/* Settings Modal */}
+      {showSettings&&<><div className="bk" onClick={()=>setShowSettings(false)}/><div className="ml">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}><h3 style={{fontSize:18,fontWeight:700}}>⚙️ 設定</h3>{closeBtn(()=>setShowSettings(false))}</div>
+        <div style={{display:"flex",flexDirection:"column",gap:20}}>
+          {/* App Name */}
+          <div>
+            {lbl("アプリ名")}
+            <input value={config.appName} onChange={(e)=>saveConfig({...config,appName:e.target.value})} style={{width:"100%"}} />
+          </div>
+
+          {/* Members */}
+          <div>
+            {lbl("メンバー管理")}
+            <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:12}}>
+              {members.map((m,i)=>(
+                <div key={m} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"var(--card2)",borderRadius:12}}>
+                  <div style={{width:24,height:24,borderRadius:12,background:PALETTE[i%PALETTE.length],display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>{getMI(m)}</div>
+                  <span style={{flex:1,fontSize:14,fontWeight:600}}>{m}</span>
+                  <button className="bt" onClick={()=>removeMember(m)} style={{background:"none",color:"#FF3B30",fontSize:12,fontWeight:600,padding:"4px 8px"}}>削除</button>
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <input value={newMember} onChange={(e)=>setNewMember(e.target.value)} onKeyDown={(e)=>{if(e.key==="Enter"){addMember();}}} placeholder="新しいメンバー名" style={{flex:1}} />
+              <button className="bt" onClick={addMember} style={{background:"#007AFF",color:"#fff",padding:"8px 16px",borderRadius:10,fontSize:13,fontWeight:600}}>追加</button>
+            </div>
+          </div>
+
+          {/* Scoring Rules */}
+          <div>
+            {lbl("配点ルール")}
+            {CATEGORIES.map((cat)=>(
+              <div key={cat} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
+                <span style={{fontSize:18}}>{CE[cat]}</span>
+                <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700}}>{cat}</div></div>
+                <div style={{background:CC[cat]+"18",padding:"4px 12px",borderRadius:8,fontWeight:700,fontSize:13,color:CC[cat]}}>{POINT_RATES[cat].label}</div>
+              </div>
+            ))}
+            <div style={{marginTop:12,padding:14,background:"var(--card2)",borderRadius:12,fontSize:11,color:"var(--sub)",lineHeight:1.6}}>
+              <strong>称号:</strong> {TITLES.map((t)=>`${t.emoji}${t.name}(${t.min}pt)`).join(" → ")}
+            </div>
+          </div>
+
+          {/* Data info */}
+          <div style={{padding:14,background:"var(--card2)",borderRadius:12,fontSize:12,color:"var(--sub)"}}>
+            <div>記録数: {entries.length}件 · 積読: {wishlist.length}件 · メンバー: {members.length}人</div>
+            <div style={{marginTop:4}}>ストレージキー: kyouyou-v7, kyouyou-config-v1</div>
+            <div style={{marginTop:4}}>このアプリを複製するには、共有リンクをコピーして別の環境で開いてください。設定で別のメンバー・アプリ名に変更すれば、別コミュニティとして運用できます。</div>
+          </div>
+        </div>
+      </div></>}
+    </div>
+  );
+}
+
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
