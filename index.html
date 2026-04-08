@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="教養ポイント">
+<meta name="theme-color" content="#1C1C1E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>教養ポイント</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','Hiragino Sans',sans-serif;background:#F2F2F7}
+</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+</head>
+<body>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#8E8E93"><div style="text-align:center"><div style="font-size:40px;margin-bottom:16px">📚</div><div>読み込み中...</div></div></div></div>
+<script>
+async function _sg(k){try{var v=localStorage.getItem(k);return v?{value:v}:null}catch(e){return null}}
+async function _ss(k,v){try{localStorage.setItem(k,v);return{key:k,value:v}}catch(e){return null}}
+async function _sd(k){try{localStorage.removeItem(k);return{key:k}}catch(e){return null}}
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){});}
+window.onerror=function(m,u,l){document.getElementById('root').innerHTML='<pre style="padding:20px;color:red">Error: '+m+'\nLine: '+l+'</pre>';};
+</script>
+<script type="text/babel">
+var useState = React.useState;
+var useEffect = React.useEffect;
+var useCallback = React.useCallback;
+var useMemo = React.useMemo;
+
+/* Config */
+var DEFAULT_MEMBERS = ["伊藤 佑亮","榎嶋 孝之","菊池 智成","森本 航平"];
+var CATEGORIES = ["映画","ドラマ","アニメ","本","漫画"];
+var POINT_RATES = {
+  映画:{rate:3,unit:"本",label:"3pt/作品"},ドラマ:{rate:0.5,unit:"話",label:"0.5pt/話"},
+  アニメ:{rate:0.5,unit:"話",label:"0.5pt/話"},本:{rate:0.04,unit:"頁",label:"4pt/100頁"},
+  漫画:{rate:1,unit:"巻",label:"1pt/巻"}
+};
+var INTERESTS = ["アクション","SF","ファンタジー","ミステリー","恋愛","コメディ","ホラー","歴史","経済","ビジネス","自己啓発","哲学","科学","心理学","テクノロジー","小説","エッセイ","スポーツ","音楽"];
+var CC = {映画:"#FF3B30",ドラマ:"#30D158",アニメ:"#007AFF",本:"#FF9F0A",漫画:"#BF5AF2"};
+var CE = {映画:"🎬",ドラマ:"📺",アニメ:"🎨",本:"📖",漫画:"📚"};
+var PALETTE = ["#007AFF","#FF9500","#34C759","#AF52DE","#FF3B30","#5AC8FA","#FF2D55","#FFCC00","#30D158","#FF6482"];
+var RANK_C = ["#FFD700","#C0C0C0","#CD7F32","#8E8E93","#8E8E93","#8E8E93"];
+var TITLES = [
+  {min:0,name:"見習い",emoji:"🌱"},{min:15,name:"教養入門者",emoji:"📗"},
+  {min:30,name:"教養の芽",emoji:"🌿"},{min:50,name:"教養戦士",emoji:"⚔️"},
+  {min:80,name:"知の探究者",emoji:"🔭"},{min:120,name:"教養マスター",emoji:"🎓"},
+  {min:200,name:"ニホンカモシカ",emoji:"🦌"},{min:250,name:"カモノハシ",emoji:"🦆"},
+  {min:300,name:"ソクラテス",emoji:"🏛️"},{min:350,name:"フクロウ博士",emoji:"🦉"},
+  {min:400,name:"ダ・ヴィンチ",emoji:"🎨"},{min:450,name:"ユニコーン",emoji:"🦄"},
+  {min:500,name:"コペルニクス",emoji:"🌍"},{min:550,name:"不死鳥",emoji:"🔥"},
+  {min:600,name:"ニュートン",emoji:"🍎"},{min:650,name:"ドラゴン",emoji:"🐉"},
+  {min:700,name:"シェイクスピア",emoji:"🎭"},{min:750,name:"ガリレオ",emoji:"🔬"},
+  {min:800,name:"テスラ",emoji:"⚡"},{min:900,name:"レオナルド",emoji:"👑"},
+  {min:1000,name:"GOAT アインシュタイン",emoji:"🧠"}
+];
+
+var CATALOG = [
+  {title:"ショーシャンクの空に",category:"映画",tags:["名作"],lang:"英語",count:1},
+  {title:"インターステラー",category:"映画",tags:["SF","科学"],lang:"英語",count:1},
+  {title:"パラサイト 半地下の家族",category:"映画",tags:["社会","ミステリー"],lang:"韓国語",count:1},
+  {title:"ダークナイト",category:"映画",tags:["アクション","哲学"],lang:"英語",count:1},
+  {title:"マトリックス",category:"映画",tags:["SF","アクション"],lang:"英語",count:1},
+  {title:"ソーシャル・ネットワーク",category:"映画",tags:["ビジネス","テクノロジー"],lang:"英語",count:1},
+  {title:"オッペンハイマー",category:"映画",tags:["歴史","科学"],lang:"英語",count:1},
+  {title:"万引き家族",category:"映画",tags:["社会"],lang:"日本語",count:1},
+  {title:"ブレイキング・バッド",category:"ドラマ",tags:["ミステリー","心理学"],lang:"英語",count:62},
+  {title:"THE LAST OF US",category:"ドラマ",tags:["SF","アクション"],lang:"英語",count:9},
+  {title:"SHOGUN 将軍",category:"ドラマ",tags:["歴史","アクション"],lang:"英語",count:10},
+  {title:"梨泰院クラス",category:"ドラマ",tags:["ビジネス","恋愛"],lang:"韓国語",count:16},
+  {title:"半沢直樹",category:"ドラマ",tags:["ビジネス","社会"],lang:"日本語",count:10},
+  {title:"進撃の巨人",category:"アニメ",tags:["アクション","哲学"],lang:"日本語",count:87},
+  {title:"鬼滅の刃",category:"アニメ",tags:["アクション","ファンタジー"],lang:"日本語",count:44},
+  {title:"STEINS;GATE",category:"アニメ",tags:["SF","ミステリー"],lang:"日本語",count:24},
+  {title:"葬送のフリーレン",category:"アニメ",tags:["ファンタジー","哲学"],lang:"日本語",count:28},
+  {title:"サピエンス全史",category:"本",tags:["歴史","科学","哲学"],lang:"日本語",count:500},
+  {title:"嫌われる勇気",category:"本",tags:["哲学","自己啓発","心理学"],lang:"日本語",count:296},
+  {title:"三体",category:"本",tags:["SF","科学","小説"],lang:"中国語",count:550},
+  {title:"Atomic Habits",category:"本",tags:["自己啓発","心理学"],lang:"英語",count:320},
+  {title:"金持ち父さん 貧乏父さん",category:"本",tags:["経済","ビジネス"],lang:"英語",count:350},
+  {title:"チェンソーマン",category:"漫画",tags:["アクション","ホラー"],lang:"日本語",count:16},
+  {title:"ゴールデンカムイ",category:"漫画",tags:["歴史","アクション","コメディ"],lang:"日本語",count:31},
+  {title:"宇宙兄弟",category:"漫画",tags:["科学","自己啓発"],lang:"日本語",count:42},
+  {title:"SPY×FAMILY",category:"漫画",tags:["アクション","コメディ"],lang:"日本語",count:13}
+];
+
+var INIT = [
+  {id:"1",member:"伊藤 佑亮",title:"トップガン",category:"映画",count:1,rating:5,date:"2022-11-06",comment:"",recommendation:80,tags:["アクション"],spoiler:false},
+  {id:"2",member:"伊藤 佑亮",title:"トップガン マーベリック",category:"映画",count:1,rating:4,date:"2022-12-06",comment:"Guess you were not the one (菊池)",recommendation:75,tags:["アクション"],spoiler:false},
+  {id:"3",member:"伊藤 佑亮",title:"サラ金の歴史",category:"本",count:345,rating:4,date:"2022-07-29",comment:"おもろい",recommendation:70,tags:["歴史","経済"],spoiler:false},
+  {id:"4",member:"伊藤 佑亮",title:"ペーパーハウス",category:"ドラマ",count:6,rating:5,date:"2022-12-08",comment:"おもろいね",recommendation:90,tags:["アクション"],spoiler:false},
+  {id:"5",member:"伊藤 佑亮",title:"Peaky Blinders",category:"ドラマ",count:34,rating:4,date:"2022-09-01",comment:"",recommendation:80,tags:["歴史","アクション"],spoiler:false},
+  {id:"6",member:"榎嶋 孝之",title:"コーダ",category:"映画",count:1,rating:5,date:"2022-06-16",comment:"",recommendation:95,tags:[],spoiler:false},
+  {id:"7",member:"榎嶋 孝之",title:"キングダム2",category:"映画",count:1,rating:4,date:"2022-07-28",comment:"",recommendation:70,tags:["アクション","歴史"],spoiler:false},
+  {id:"8",member:"榎嶋 孝之",title:"アキラとあきら",category:"映画",count:1,rating:4,date:"2022-08-31",comment:"",recommendation:70,tags:["ビジネス"],spoiler:false},
+  {id:"9",member:"菊池 智成",title:"スパイファミリー",category:"アニメ",count:10,rating:5,date:"2022-06-10",comment:"",recommendation:90,tags:["アクション","コメディ"],spoiler:false},
+  {id:"10",member:"菊池 智成",title:"アヴァランチ",category:"ドラマ",count:10,rating:5,date:"2022-06-12",comment:"",recommendation:85,tags:[],spoiler:false},
+  {id:"11",member:"森本 航平",title:"志高く",category:"本",count:484,rating:4,date:"2022-07-20",comment:"偉人すぎて草",recommendation:80,tags:["ビジネス","自己啓発"],spoiler:false},
+  {id:"12",member:"森本 航平",title:"Peaky Blinders",category:"ドラマ",count:36,rating:4,date:"2022-08-15",comment:"聞き取れん→聞き取れるようになってきた",recommendation:85,tags:["歴史","アクション"],spoiler:false},
+  {id:"13",member:"森本 航平",title:"Batman Begins",category:"映画",count:1,rating:4,date:"2022-08-20",comment:"メンツえぐ",recommendation:75,tags:["アクション"],spoiler:false}
+];
+
+/* Helpers */
+function cp(cat,cnt){return Math.round(cnt*POINT_RATES[cat].rate*100)/100}
+function fnm(m){return m.split(" ")[0]}
+function getTitle(pts){var t=TITLES[0];for(var i=0;i<TITLES.length;i++){if(pts>=TITLES[i].min)t=TITLES[i];}var nx=null;for(var j=0;j<TITLES.length;j++){if(TITLES[j].min>pts){nx=TITLES[j];break;}}return{name:t.name,emoji:t.emoji,next:nx,progress:nx?(pts-t.min)/(nx.min-t.min):1};}
+function getMC(m,members){var idx=members.indexOf(m);return PALETTE[idx%PALETTE.length]}
+function getMI(m){return m?m.charAt(0):"?"}
+function recommend(member,entries,interests,wishlist,dismissed,filterCat,filterLang){
+  var me=entries.filter(function(e){return e.member===member});
+  var allT={};entries.forEach(function(e){allT[e.title]=true});
+  var wishT={};(wishlist||[]).forEach(function(w){wishT[w.title]=true});
+  var dSet={};(dismissed||[]).forEach(function(d){dSet[d]=true});
+  var myTags={};
+  me.forEach(function(e){(e.tags||[]).forEach(function(t){myTags[t]=(myTags[t]||0)+(e.rating>=4?3:e.rating>=3?1:0);});});
+  (interests||[]).forEach(function(i){myTags[i]=(myTags[i]||0)+5;});
+  var othersHigh={};
+  entries.filter(function(e){return e.member!==member&&e.rating>=4&&e.recommendation>=60}).forEach(function(e){othersHigh[e.title]=(othersHigh[e.title]||0)+1;});
+  var catCount={};me.forEach(function(e){catCount[e.category]=(catCount[e.category]||0)+1;});
+  var totalCat=0;Object.keys(catCount).forEach(function(k){totalCat+=catCount[k];});totalCat=totalCat||1;
+  var pool=CATALOG.filter(function(c){return !allT[c.title]&&!wishT[c.title]&&!dSet[c.title]});
+  if(filterCat&&filterCat!=="all")pool=pool.filter(function(c){return c.category===filterCat});
+  if(filterLang&&filterLang!=="all")pool=pool.filter(function(c){return c.lang===filterLang});
+  return pool.map(function(item){
+    var score=0;var reasons=[];
+    var tagMatch=(item.tags||[]).filter(function(t){return myTags[t]>0;});
+    tagMatch.forEach(function(t){score+=myTags[t];});
+    if(tagMatch.length>=2)reasons.push(tagMatch.slice(0,2).join("・")+"好きにぴったり");
+    if(othersHigh[item.title]){score+=othersHigh[item.title]*5;reasons.push("仲間が高評価");}
+    var catRatio=(catCount[item.category]||0)/totalCat;
+    if(catRatio<0.1){score+=8;reasons.push(item.category+"の新たな冒険");}
+    var iMatch=(item.tags||[]).filter(function(t){return(interests||[]).indexOf(t)>=0;});
+    if(iMatch.length>0&&reasons.length===0)reasons.push(iMatch[0]+"に興味あり");
+    return{title:item.title,category:item.category,tags:item.tags,lang:item.lang,count:item.count,score:score,reason:reasons[0]||item.category+"の名作",match:score>=15?"high":score>=8?"medium":"low"};
+  }).sort(function(a,b){return b.score-a.score}).slice(0,6);
+}
+
+/* CSS Pie Chart */
+function PieChart(props) {
+  var data = props.data; var size = props.size || 160;
+  var total = 0; data.forEach(function(d){total += d.value;});
+  if (total === 0) return <div style={{width:size,height:size,borderRadius:"50%",background:"var(--bb)",display:"flex",alignItems:"center",justifyContent:"center",color:"var(--sub)",fontSize:12}}>–</div>;
+  var segments = []; var acc = 0;
+  data.forEach(function(d) {
+    var pct = (d.value / total) * 100;
+    segments.push(d.color + " " + acc + "% " + (acc + pct) + "%");
+    acc += pct;
+  });
+  return <div style={{width:size,height:size,borderRadius:"50%",background:"conic-gradient("+segments.join(",")+")",margin:"0 auto"}} />;
+}
+
+/* Main App */
+function App() {
+  var es = useState([]); var entries = es[0]; var setEntries = es[1];
+  var ws = useState([]); var wishlist = ws[0]; var setWishlist = ws[1];
+  var ps = useState({}); var profiles = ps[0]; var setProfiles = ps[1];
+  var cs = useState({members:DEFAULT_MEMBERS,appName:"教養ポイント"}); var config = cs[0]; var setConfig = cs[1];
+  var ls = useState(true); var loading = ls[0]; var setLoading = ls[1];
+  var ds = useState(false); var dark = ds[0]; var setDark = ds[1];
+  var vs = useState("dashboard"); var view = vs[0]; var setView = vs[1];
+  var sms = useState(null); var selMem = sms[0]; var setSelMem = sms[1];
+  var sfs = useState(false); var showForm = sfs[0]; var setShowForm = sfs[1];
+  var sts = useState(false); var showSettings = sts[0]; var setShowSettings = sts[1];
+  var eis = useState(null); var editId = eis[0]; var setEditId = eis[1];
+  var des = useState(null); var detE = des[0]; var setDetE = des[1];
+  var ais = useState(false); var animIn = ais[0]; var setAnimIn = ais[1];
+  var rms = useState(""); var recMem = rms[0]; var setRecMem = rms[1];
+  var rcs = useState([]); var recs = rcs[0]; var setRecs = rcs[1];
+  var dss = useState([]); var dismissed = dss[0]; var setDismissed = dss[1];
+  var rcf = useState("all"); var recCatFilter = rcf[0]; var setRecCatFilter = rcf[1];
+  var rlf = useState("all"); var recLangFilter = rlf[0]; var setRecLangFilter = rlf[1];
+  var nms = useState(""); var newMember = nms[0]; var setNewMember = nms[1];
+  var gis = useState(false); var showGovInfo = gis[0]; var setShowGovInfo = gis[1];
+  var swf = useState(false); var showWishForm = swf[0]; var setShowWishForm = swf[1];
+  var fs = useState({member:"",title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});
+  var form = fs[0]; var setForm = fs[1];
+
+  var members = config.members;
+  var appName = config.appName;
+
+  useEffect(function(){
+    if(typeof window!=="undefined"&&window.matchMedia){
+      var mq=window.matchMedia("(prefers-color-scheme:dark)");
+      setDark(mq.matches);
+      var h=function(e){setDark(e.matches)};
+      mq.addEventListener("change",h);
+      return function(){mq.removeEventListener("change",h)};
+    }
+  },[]);
+
+  useEffect(function(){
+    (async function(){
+      try{
+        var c=await _sg("kyouyou-config-v2");if(c&&c.value)setConfig(JSON.parse(c.value));
+        var r=await _sg("kyouyou-v8");if(r&&r.value)setEntries(JSON.parse(r.value));else{setEntries(INIT);await _ss("kyouyou-v8",JSON.stringify(INIT));}
+        var w=await _sg("kyouyou-wish-v4");if(w&&w.value)setWishlist(JSON.parse(w.value));
+        var p=await _sg("kyouyou-profiles-v3");if(p&&p.value)setProfiles(JSON.parse(p.value));
+      }catch(e){setEntries(INIT);}
+      setLoading(false);setTimeout(function(){setAnimIn(true)},50);
+    })();
+  },[]);
+
+  var save=useCallback(async function(n){setEntries(n);try{await _ss("kyouyou-v8",JSON.stringify(n));}catch(e){}},[]);
+  var saveWish=useCallback(async function(n){setWishlist(n);try{await _ss("kyouyou-wish-v4",JSON.stringify(n));}catch(e){}},[]);
+  var saveProfiles=useCallback(async function(n){setProfiles(n);try{await _ss("kyouyou-profiles-v3",JSON.stringify(n));}catch(e){}},[]);
+  var saveConfig=useCallback(async function(n){setConfig(n);try{await _ss("kyouyou-config-v2",JSON.stringify(n));}catch(e){}},[]);
+
+  var handleReset=async function(){
+    if(!confirm("全データをリセットしますか？"))return;
+    try{await _ss("kyouyou-v8",JSON.stringify(INIT));await _ss("kyouyou-wish-v4","[]");await _ss("kyouyou-profiles-v3","{}");
+    }catch(e){}setEntries(INIT.slice());setWishlist([]);setProfiles({});setRecs([]);
+  };
+
+  var handleSubmit=function(){
+    if(!form.title.trim())return;
+    var d=Object.assign({},form);delete d.tagInput;
+    if(editId){save(entries.map(function(e){return e.id===editId?Object.assign(d,{id:editId}):e}));setEditId(null);}
+    else{save(entries.concat([Object.assign(d,{id:Date.now().toString()})]));}
+    setForm({member:form.member,title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});
+    setShowForm(false);
+  };
+
+  var addTag=function(t){var tag=t.trim();if(tag&&form.tags.indexOf(tag)<0)setForm(Object.assign({},form,{tags:form.tags.concat([tag]),tagInput:""}));else setForm(Object.assign({},form,{tagInput:""}));};
+  var toggleInterest=function(member,interest){var cur=(profiles[member]&&profiles[member].interests)||[];var next=cur.indexOf(interest)>=0?cur.filter(function(i){return i!==interest}):cur.concat([interest]);var np=Object.assign({},profiles);np[member]=Object.assign({},np[member]||{},{interests:next});saveProfiles(np);};
+  var generateRecs=function(){var interests=(profiles[recMem]&&profiles[recMem].interests)||[];setRecs(recommend(recMem,entries,interests,wishlist,dismissed,recCatFilter,recLangFilter));};
+
+  var getStats=useCallback(function(m,data){
+    var me=data.filter(function(e){return e.member===m});
+    var total=me.reduce(function(s,e){return s+cp(e.category,e.count)},0);
+    var byC={};CATEGORIES.forEach(function(c){byC[c]=me.filter(function(e){return e.category===c}).reduce(function(s,e){return s+cp(e.category,e.count)},0);});
+    var rated=me.filter(function(e){return e.rating>0});
+    var t=Math.round(total*100)/100;
+    return{total:t,byCategory:byC,count:me.length,avgR:rated.length?rated.reduce(function(s,e){return s+e.rating},0)/rated.length:0,title:getTitle(t),entries:me};
+  },[]);
+
+  var rankings=useMemo(function(){return members.map(function(m){return Object.assign({member:m},getStats(m,entries))}).sort(function(a,b){return b.total-a.total})},[entries,getStats,members]);
+
+  if(loading)return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:dark?"#000":"#F2F2F7",color:"#8E8E93"}}><div style={{textAlign:"center"}}><div style={{fontSize:40,marginBottom:16}}>📚</div><div>読み込み中...</div></div></div>;
+
+  var detail=selMem?getStats(selMem,entries):null;
+  var th=dark?{"--bg":"#000","--card":"#1C1C1E","--card2":"#2C2C2E","--text":"#F5F5F7","--sub":"#98989D","--border":"#38383A","--bb":"#38383A","--ig":"#2C2C2E","--ib":"#48484A"}:{"--bg":"#F2F2F7","--card":"#fff","--card2":"#F5F5F5","--text":"#1C1C1E","--sub":"#86868B","--border":"#D1D1D6","--bb":"#E5E5EA","--ig":"#FAFAFA","--ib":"#D1D1D6"};
+  var TABS=[{k:"dashboard",l:"ホーム"},{k:"entries",l:"記録"},{k:"wish",l:"📌積読"},{k:"rec",l:"🎯おすすめ"}];
+  var css="input,select,textarea{font-family:inherit;outline:none;border:1.5px solid var(--ib);border-radius:12px;padding:10px 14px;font-size:15px;background:var(--ig);color:var(--text)}input:focus,select:focus,textarea:focus{border-color:#007AFF}";
+
+  return (
+    <div style={Object.assign({},th,{fontFamily:"-apple-system,BlinkMacSystemFont,'Helvetica Neue','Hiragino Sans',sans-serif",background:"var(--bg)",minHeight:"100vh",color:"var(--text)",paddingBottom:100,opacity:animIn?1:0,transition:"opacity .6s"})}>
+      <style>{css}</style>
+
+      {/* Header */}
+      <div style={{background:dark?"linear-gradient(135deg,#000,#1C1C1E)":"linear-gradient(135deg,#1C1C1E,#2C2C2E)",padding:"48px 24px 28px",color:"#fff"}}>
+        <div style={{maxWidth:720,margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              <div style={{width:40,height:40,borderRadius:10,background:"rgba(255,255,255,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📚</div>
+              <h1 style={{fontSize:22,fontWeight:700}}>{appName}</h1>
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={function(){setDark(!dark)}} style={{background:"rgba(255,255,255,.12)",color:"#fff",padding:"8px 10px",borderRadius:10,fontSize:12,border:"none",cursor:"pointer"}}>{dark?"☀️":"🌙"}</button>
+              <button onClick={function(){setShowSettings(true)}} style={{background:"rgba(255,255,255,.1)",color:"#fff",padding:"8px 10px",borderRadius:10,fontSize:12,border:"none",cursor:"pointer"}}>⚙️</button>
+              <button onClick={handleReset} style={{background:"rgba(255,255,255,.06)",color:"#8E8E93",padding:"8px 10px",borderRadius:10,fontSize:11,border:"none",cursor:"pointer"}}>リセット</button>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:4,marginTop:12,background:"rgba(255,255,255,.08)",padding:4,borderRadius:12,overflowX:"auto"}}>
+            {TABS.map(function(t){return <button key={t.k} onClick={function(){setView(t.k);setSelMem(null)}} style={{padding:"7px 14px",borderRadius:8,fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:view===t.k?"#007AFF":"transparent",color:view===t.k?"#fff":"rgba(255,255,255,.5)",whiteSpace:"nowrap"}}>{t.l}</button>})}
+            {members.map(function(m){return <button key={m} onClick={function(){setView("member");setSelMem(m)}} style={{padding:"7px 10px",borderRadius:8,fontSize:11,fontWeight:600,border:"none",cursor:"pointer",background:view==="member"&&selMem===m?"#007AFF":"transparent",color:view==="member"&&selMem===m?"#fff":"rgba(255,255,255,.5)",whiteSpace:"nowrap"}}>{fnm(m)}</button>})}
+          </div>
+        </div>
+      </div>
+
+      <div style={{maxWidth:720,margin:"0 auto",padding:"24px 16px"}}>
+
+        {/* DASHBOARD */}
+        {view==="dashboard" && <div>
+          {rankings.length>0 && rankings[0].total>0 && (function(){var r=rankings[0];var tt=r.title;return (
+            <div style={{background:"var(--card)",borderRadius:16,padding:24,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+              <div style={{display:"flex",alignItems:"center",gap:16}}>
+                <div style={{fontSize:36}}>👑</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,color:"var(--sub)",fontWeight:600}}>現在1位</div>
+                  <div style={{fontSize:22,fontWeight:700}}>{r.member}</div>
+                  <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#FFD70020",color:"#B8860B",fontWeight:600}}>{tt.emoji} {tt.name}</span>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:36,fontWeight:800,color:"#FF9500"}}>{r.total.toFixed(1)}</div>
+                  <div style={{fontSize:12,color:"var(--sub)"}}>pts</div>
+                </div>
+              </div>
+              {tt.next && <div style={{marginTop:14}}>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--sub)",marginBottom:4}}>
+                  <span>{tt.emoji} {tt.name}</span>
+                  <span>次: {tt.next.emoji} {tt.next.name} ({tt.next.min}pt)</span>
+                </div>
+                <div style={{height:6,borderRadius:3,background:"var(--bb)",overflow:"hidden"}}>
+                  <div style={{height:"100%",borderRadius:3,width:(tt.progress*100)+"%",background:"linear-gradient(90deg,#FFD700,#FF9500)",transition:"width .8s"}} />
+                </div>
+              </div>}
+            </div>
+          )})()}
+
+          {/* Rankings */}
+          <div style={{background:"var(--card)",borderRadius:16,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+            <div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h2 style={{fontSize:16,fontWeight:700}}>ランキング</h2></div>
+            {rankings.map(function(r,i){var mx=rankings[0].total||1;var mc=getMC(r.member,members);return (
+              <div key={r.member} onClick={function(){setView("member");setSelMem(r.member)}} style={{display:"flex",alignItems:"center",gap:12,padding:"14px 20px",borderBottom:i<rankings.length-1?"1px solid var(--border)":"none",cursor:"pointer"}}>
+                <div style={{width:28,height:28,borderRadius:14,background:RANK_C[i],display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:i<3?"#fff":"var(--sub)"}}>{i+1}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                    <span style={{fontSize:14,fontWeight:600}}>{r.member}</span>
+                    <span style={{fontSize:10,padding:"1px 6px",borderRadius:6,background:"#FFD70018",color:"#B8860B",fontWeight:600}}>{r.title.emoji} {r.title.name}</span>
+                  </div>
+                  <div style={{height:6,borderRadius:3,background:"var(--bb)",overflow:"hidden"}}>
+                    <div style={{height:"100%",borderRadius:3,width:(r.total/mx*100)+"%",background:mc,transition:"width .8s"}} />
+                  </div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:18,fontWeight:700}}>{r.total.toFixed(1)}</div>
+                  <div style={{fontSize:11,color:"var(--sub)"}}>{r.count}作品</div>
+                </div>
+                <div style={{color:"var(--sub)",fontSize:14}}>›</div>
+              </div>
+            )})}
+          </div>
+
+          {/* Pie */}
+          {(function(){
+            var totalAll=rankings.reduce(function(s,r){return s+r.total},0);
+            if(totalAll===0)return null;
+            var pieData=rankings.map(function(r){return{name:fnm(r.member),full:r.member,value:r.total,pct:Math.round(r.total/totalAll*1000)/10,color:getMC(r.member,members)}});
+            return <div style={{background:"var(--card)",borderRadius:16,padding:20,marginTop:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                <h3 style={{fontSize:15,fontWeight:700}}>📊 ポイント占有率</h3>
+                <button onClick={function(){setShowGovInfo(!showGovInfo)}} style={{background:"var(--card2)",padding:"4px 10px",borderRadius:8,fontSize:12,color:"var(--sub)",border:"none",cursor:"pointer"}}>📖 議決権</button>
+              </div>
+              {showGovInfo && <div style={{padding:12,background:"var(--card2)",borderRadius:12,marginBottom:16,fontSize:12,color:"var(--sub)",lineHeight:1.7}}>
+                <div style={{fontWeight:700,color:"var(--text)",marginBottom:4}}>📖 議決権の閾値</div>
+                <div><span style={{color:"#FF3B30",fontWeight:700}}>●</span> 実質支配権: 50%超</div>
+                <div><span style={{color:"#FF9500",fontWeight:700}}>●</span> 拒否権: 33.4%超</div>
+                <div><span style={{color:"#007AFF",fontWeight:700}}>●</span> 議案提案権: 10%以上</div>
+              </div>}
+              <PieChart data={pieData} size={160} />
+              <div style={{marginTop:12}}>
+                {pieData.map(function(d){
+                  var badge=d.pct>50?"実質支配権":d.pct>33.4?"拒否権":d.pct>=10?"議案提案権":null;
+                  var badgeColor=d.pct>50?"#FF3B30":d.pct>33.4?"#FF9500":"#007AFF";
+                  return <div key={d.full} style={{display:"flex",alignItems:"center",gap:10,padding:"4px 0"}}>
+                    <span style={{width:12,height:12,borderRadius:6,background:d.color,flexShrink:0}} />
+                    <span style={{fontSize:13,fontWeight:600,flex:1}}>{d.full}</span>
+                    <span style={{fontSize:14,fontWeight:700}}>{d.pct}%</span>
+                    {badge && <span style={{fontSize:10,padding:"2px 8px",borderRadius:6,background:badgeColor+"18",color:badgeColor,fontWeight:600}}>{badge}</span>}
+                  </div>
+                })}
+              </div>
+            </div>;
+          })()}
+        </div>}
+
+        {/* ENTRIES */}
+        {view==="entries" && <div style={{background:"var(--card)",borderRadius:16,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+          <div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h2 style={{fontSize:16,fontWeight:700}}>全記録 — {entries.length}件</h2></div>
+          {entries.slice().sort(function(a,b){return(b.date||"").localeCompare(a.date||"")}).map(function(e){return (
+            <div key={e.id} onClick={function(){setDetE(e)}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",borderBottom:"1px solid var(--border)",cursor:"pointer"}}>
+              <div style={{width:26,height:26,borderRadius:13,background:getMC(e.member,members)+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:getMC(e.member,members),flexShrink:0}}>{getMI(e.member)}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                  <span style={{fontSize:13,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.title}</span>
+                  <span style={{fontSize:10,padding:"1px 8px",borderRadius:10,background:CC[e.category]+"22",color:CC[e.category],fontWeight:600}}>{e.category}</span>
+                </div>
+                <div style={{fontSize:11,color:"var(--sub)"}}>{fnm(e.member)} · {e.date||""}</div>
+              </div>
+              <div style={{fontSize:14,fontWeight:700,color:"#007AFF",flexShrink:0}}>+{cp(e.category,e.count).toFixed(1)}</div>
+            </div>
+          )})}
+        </div>}
+
+        {/* WISHLIST */}
+        {view==="wish" && <div style={{background:"var(--card)",borderRadius:16,padding:20,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <h2 style={{fontSize:16,fontWeight:700}}>📌 積読リスト</h2>
+            <button onClick={function(){setShowWishForm(true)}} style={{background:"#007AFF",color:"#fff",padding:"8px 14px",borderRadius:10,fontSize:12,fontWeight:600,border:"none",cursor:"pointer"}}>+ 追加</button>
+          </div>
+          {wishlist.length===0 && <div style={{textAlign:"center",padding:40,color:"var(--sub)"}}><div style={{fontSize:32,marginBottom:8}}>📚</div><div>まだありません</div></div>}
+          {wishlist.map(function(w,i){return (
+            <div key={w.id} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:i<wishlist.length-1?"1px solid var(--border)":"none"}}>
+              <span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:CC[w.category]+"22",color:CC[w.category],fontWeight:600}}>{w.category}</span>
+              <div style={{flex:1}}><div style={{fontSize:13,fontWeight:600}}>{w.title}</div></div>
+              <button onClick={function(){setForm({member:w.member||members[0],title:w.title,category:w.category,count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});setEditId(null);setShowForm(true);saveWish(wishlist.filter(function(x){return x.id!==w.id}));}} style={{background:"#30D158",color:"#fff",padding:"5px 10px",borderRadius:8,fontSize:11,fontWeight:600,border:"none",cursor:"pointer"}}>✓完了</button>
+              <button onClick={function(){saveWish(wishlist.filter(function(x){return x.id!==w.id}))}} style={{background:"none",color:"#FF3B30",fontSize:11,fontWeight:600,padding:"5px 8px",border:"none",cursor:"pointer"}}>削除</button>
+            </div>
+          )})}
+        </div>}
+
+        {/* RECOMMEND */}
+        {view==="rec" && <div>
+          <div style={{background:"var(--card)",borderRadius:16,padding:24,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+            <h2 style={{fontSize:16,fontWeight:700,marginBottom:4}}>🎯 おすすめ</h2>
+            <p style={{fontSize:11,color:"var(--sub)",marginBottom:16}}>興味プロファイル × 履歴 × 仲間の評価を分析</p>
+            <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
+              {members.map(function(m){return <button key={m} onClick={function(){setRecMem(m);setRecs([])}} style={{padding:"7px 14px",borderRadius:10,fontSize:12,fontWeight:600,border:"none",cursor:"pointer",background:recMem===m?getMC(m,members):"var(--card2)",color:recMem===m?"#fff":"var(--text)"}}>{fnm(m)}</button>})}
+            </div>
+            {recMem && <div>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>📋 {fnm(recMem)}の興味</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:16}}>
+                {INTERESTS.map(function(interest){var sel=(profiles[recMem]&&profiles[recMem].interests||[]).indexOf(interest)>=0;return <button key={interest} onClick={function(){toggleInterest(recMem,interest)}} style={{padding:"5px 12px",borderRadius:16,fontSize:11,fontWeight:600,border:"none",cursor:"pointer",background:sel?"#007AFF":"var(--card2)",color:sel?"#fff":"var(--sub)"}}>{sel?"✓ ":""}{interest}</button>})}
+              </div>
+              <div style={{display:"flex",gap:10,marginBottom:16}}>
+                <select value={recCatFilter} onChange={function(e){setRecCatFilter(e.target.value)}} style={{flex:1,fontSize:13}}><option value="all">カテゴリ: すべて</option>{CATEGORIES.map(function(c){return <option key={c} value={c}>{c}</option>})}</select>
+                <select value={recLangFilter} onChange={function(e){setRecLangFilter(e.target.value)}} style={{flex:1,fontSize:13}}><option value="all">言語: すべて</option><option value="日本語">日本語</option><option value="英語">英語</option><option value="韓国語">韓国語</option></select>
+              </div>
+              <button onClick={generateRecs} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:14,borderRadius:14,fontSize:15,fontWeight:700,width:"100%",border:"none",cursor:"pointer"}}>🎯 おすすめを生成</button>
+            </div>}
+          </div>
+          {recs.length>0 && <div style={{background:"var(--card)",borderRadius:16,padding:20,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+            {recs.map(function(rec,i){var seen=entries.some(function(e){return e.title===rec.title});var inW=wishlist.some(function(w){return w.title===rec.title});return (
+              <div key={i} style={{padding:14,background:"var(--card2)",borderRadius:14,marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                  <div style={{fontSize:24}}>{CE[rec.category]}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
+                      <span style={{fontSize:14,fontWeight:700}}>{rec.title}</span>
+                      {rec.match==="high" && <span style={{fontSize:10,padding:"2px 6px",borderRadius:6,background:"#34C75920",color:"#34C759",fontWeight:600}}>高相性</span>}
+                      <span style={{fontSize:10,color:"var(--sub)"}}>{rec.lang}</span>
+                    </div>
+                    <div style={{fontSize:12,color:"var(--sub)"}}>{rec.reason}</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:6,marginTop:10}}>
+                  {seen ? <span style={{fontSize:11,color:"var(--sub)",padding:"5px 10px"}}>✓ 記録済み</span> :
+                    <button onClick={function(){setForm({member:recMem,title:rec.title,category:rec.category,count:rec.count||1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:rec.tags||[],spoiler:false,tagInput:""});setEditId(null);setShowForm(true)}} style={{background:"#30D158",color:"#fff",padding:"5px 12px",borderRadius:8,fontSize:11,fontWeight:600,border:"none",cursor:"pointer"}}>✓ 見た！</button>}
+                  {!inW&&!seen && <button onClick={function(){saveWish(wishlist.concat([{id:Date.now().toString(),title:rec.title,category:rec.category,member:recMem,note:rec.reason}]))}} style={{background:"#FF9500",color:"#fff",padding:"5px 12px",borderRadius:8,fontSize:11,fontWeight:600,border:"none",cursor:"pointer"}}>📌 気になる</button>}
+                  {inW && <span style={{fontSize:11,color:"#FF9500",padding:"5px 10px"}}>📌 積読中</span>}
+                  <button onClick={function(){setDismissed(dismissed.concat([rec.title]));setRecs(recs.filter(function(r){return r.title!==rec.title}))}} style={{background:"none",color:"var(--sub)",fontSize:11,padding:"5px 6px",border:"none",cursor:"pointer"}}>✕</button>
+                </div>
+              </div>
+            )})}
+          </div>}
+        </div>}
+
+        {/* MEMBER */}
+        {view==="member" && selMem && detail && <div>
+          <div style={{background:"var(--card)",borderRadius:16,padding:24,marginBottom:16,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
+              <div style={{flex:1}}>
+                <h2 style={{fontSize:20,fontWeight:700}}>{selMem}</h2>
+                <span style={{fontSize:10,padding:"2px 8px",borderRadius:8,background:"#FFD70020",color:"#B8860B",fontWeight:600}}>{detail.title.emoji} {detail.title.name}</span>
+                <div style={{fontSize:12,color:"var(--sub)",marginTop:4}}>{detail.count}作品 · 平均 {detail.avgR.toFixed(1)}★</div>
+              </div>
+              <div style={{textAlign:"right"}}><div style={{fontSize:30,fontWeight:800,color:getMC(selMem,members)}}>{detail.total.toFixed(1)}</div><div style={{fontSize:11,color:"var(--sub)"}}>pt</div></div>
+            </div>
+            {detail.title.next && <div style={{marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--sub)",marginBottom:4}}><span>次: {detail.title.next.emoji} {detail.title.next.name}</span><span>あと {(detail.title.next.min-detail.total).toFixed(1)}pt</span></div>
+              <div style={{height:6,borderRadius:3,background:"var(--bb)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,width:(detail.title.progress*100)+"%",background:"linear-gradient(90deg,#FFD700,#FF9500)"}} /></div>
+            </div>}
+            {CATEGORIES.filter(function(c){return detail.byCategory[c]>0}).map(function(cat){return (
+              <div key={cat} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:36,fontSize:11,fontWeight:600,color:CC[cat]}}>{cat}</div>
+                <div style={{flex:1,height:6,borderRadius:3,background:"var(--bb)",overflow:"hidden"}}><div style={{height:"100%",borderRadius:3,width:(detail.byCategory[cat]/detail.total*100)+"%",background:CC[cat]}} /></div>
+                <div style={{width:48,textAlign:"right",fontSize:12,fontWeight:600}}>{detail.byCategory[cat].toFixed(1)}</div>
+              </div>
+            )})}
+          </div>
+          <div style={{background:"var(--card)",borderRadius:16,overflow:"hidden",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+            <div style={{padding:"16px 20px 10px",borderBottom:"1px solid var(--border)"}}><h3 style={{fontSize:14,fontWeight:700}}>記録一覧</h3></div>
+            {detail.entries.slice().sort(function(a,b){return(b.date||"").localeCompare(a.date||"")}).map(function(e){return (
+              <div key={e.id} style={{padding:"12px 20px",borderBottom:"1px solid var(--border)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+                  <span style={{fontSize:14,fontWeight:600,flex:1,cursor:"pointer"}} onClick={function(){setDetE(e)}}>{e.title}</span>
+                  <span style={{fontSize:10,padding:"1px 8px",borderRadius:10,background:CC[e.category]+"22",color:CC[e.category],fontWeight:600}}>{e.category}</span>
+                  <span style={{fontSize:14,fontWeight:700,color:getMC(selMem,members)}}>+{cp(e.category,e.count).toFixed(1)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:11,color:"#FF9500"}}>{"★".repeat(Math.round(e.rating))}{"☆".repeat(5-Math.round(e.rating))} {(e.rating||0).toFixed(1)}</span>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={function(){setForm(Object.assign({},e,{tagInput:""}));setEditId(e.id);setShowForm(true)}} style={{background:"none",color:"#007AFF",fontSize:11,fontWeight:600,padding:"5px 8px",border:"none",cursor:"pointer"}}>編集</button>
+                    <button onClick={function(){save(entries.filter(function(x){return x.id!==e.id}))}} style={{background:"none",color:"#FF3B30",fontSize:11,fontWeight:600,padding:"5px 8px",border:"none",cursor:"pointer"}}>削除</button>
+                  </div>
+                </div>
+                {e.comment && <div style={{fontSize:12,color:"var(--sub)",marginTop:6,padding:"6px 10px",background:"var(--card2)",borderRadius:10,fontStyle:"italic"}}>💬 {e.comment}</div>}
+              </div>
+            )})}
+          </div>
+        </div>}
+      </div>
+
+      {/* FAB */}
+      <button onClick={function(){setEditId(null);setForm({member:selMem||members[0],title:"",category:"映画",count:1,rating:3,date:new Date().toISOString().split("T")[0],comment:"",recommendation:50,tags:[],spoiler:false,tagInput:""});setShowForm(true)}} style={{position:"fixed",bottom:28,right:28,width:56,height:56,borderRadius:28,background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",fontSize:28,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(0,122,255,.4)",zIndex:50,border:"none",cursor:"pointer"}}>+</button>
+
+      {/* Detail Modal */}
+      {detE && <div>
+        <div onClick={function(){setDetE(null)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(12px)",zIndex:100}} />
+        <div style={{position:"fixed",bottom:0,left:0,right:0,maxHeight:"90vh",background:"var(--card)",borderRadius:"20px 20px 0 0",zIndex:101,overflowY:"auto",padding:"28px 24px 40px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:20}}>
+            <div><span style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:CC[detE.category]+"22",color:CC[detE.category],fontWeight:600}}>{detE.category}</span><h3 style={{fontSize:20,fontWeight:700,marginTop:8}}>{detE.title}</h3><div style={{fontSize:12,color:"var(--sub)",marginTop:4}}>{detE.member} · {detE.date||""}</div></div>
+            <button onClick={function(){setDetE(null)}} style={{background:"var(--bb)",width:32,height:32,borderRadius:16,fontSize:14,border:"none",cursor:"pointer",color:"var(--sub)"}}>✕</button>
+          </div>
+          <div style={{display:"flex",gap:16,marginBottom:16,flexWrap:"wrap"}}>
+            <div><div style={{fontSize:11,color:"var(--sub)"}}>評価</div><div style={{color:"#FF9500"}}>{"★".repeat(Math.round(detE.rating))} {(detE.rating||0).toFixed(1)}</div></div>
+            <div><div style={{fontSize:11,color:"var(--sub)"}}>教養pt</div><div style={{fontSize:22,fontWeight:800,color:"#007AFF"}}>{cp(detE.category,detE.count).toFixed(1)}</div></div>
+          </div>
+          {detE.comment && <div style={{padding:12,background:"var(--card2)",borderRadius:12,fontSize:13,lineHeight:1.7,marginBottom:16}}>{detE.comment}</div>}
+          <a href={"https://www.amazon.co.jp/s?k="+encodeURIComponent(detE.title)} target="_blank" rel="noopener noreferrer" style={{display:"block",textAlign:"center",padding:12,background:"var(--card2)",borderRadius:12,color:"#FF9500",fontWeight:700,fontSize:13,textDecoration:"none"}}>🔗 Amazonで探す</a>
+        </div>
+      </div>}
+
+      {/* Form Modal */}
+      {showForm && <div>
+        <div onClick={function(){setShowForm(false);setEditId(null)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(12px)",zIndex:100}} />
+        <div style={{position:"fixed",bottom:0,left:0,right:0,maxHeight:"92vh",background:"var(--card)",borderRadius:"20px 20px 0 0",zIndex:101,overflowY:"auto",padding:"28px 24px 40px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:24}}>
+            <h3 style={{fontSize:18,fontWeight:700}}>{editId?"記録を編集":"新しい記録"}</h3>
+            <button onClick={function(){setShowForm(false);setEditId(null)}} style={{background:"var(--bb)",width:32,height:32,borderRadius:16,fontSize:14,border:"none",cursor:"pointer",color:"var(--sub)"}}>✕</button>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>メンバー</label><select value={form.member} onChange={function(e){setForm(Object.assign({},form,{member:e.target.value}))}} style={{width:"100%"}}>{members.map(function(m){return <option key={m} value={m}>{m}</option>})}</select></div>
+            <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>作品名</label><input value={form.title} onChange={function(e){setForm(Object.assign({},form,{title:e.target.value}))}} placeholder="タイトル" style={{width:"100%"}} /></div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>カテゴリ</label><select value={form.category} onChange={function(e){setForm(Object.assign({},form,{category:e.target.value}))}} style={{width:"100%"}}>{CATEGORIES.map(function(c){return <option key={c} value={c}>{c}</option>})}</select></div>
+              <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>{POINT_RATES[form.category].unit}数</label><input type="number" min="1" value={form.count} onChange={function(e){setForm(Object.assign({},form,{count:parseInt(e.target.value)||1}))}} style={{width:"100%"}} /></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>評価(0-5)</label><input type="range" min="0" max="50" value={Math.round((form.rating||0)*10)} onChange={function(e){setForm(Object.assign({},form,{rating:parseInt(e.target.value)/10}))}} style={{width:"100%"}} /><div style={{color:"#FF9500",fontSize:13,textAlign:"center"}}>{(form.rating||0).toFixed(1)} ★</div></div>
+              <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>完了日</label><input type="date" value={form.date} onChange={function(e){setForm(Object.assign({},form,{date:e.target.value}))}} style={{width:"100%"}} /></div>
+            </div>
+            <div><label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>感想</label><textarea value={form.comment} onChange={function(e){setForm(Object.assign({},form,{comment:e.target.value}))}} placeholder="感想..." rows={3} style={{width:"100%",resize:"vertical"}} /></div>
+            <div style={{background:"var(--card2)",borderRadius:12,padding:12,textAlign:"center"}}><span style={{fontSize:12,color:"var(--sub)"}}>獲得: </span><span style={{fontSize:20,fontWeight:800,color:"#007AFF"}}>{cp(form.category,form.count).toFixed(1)}</span><span style={{fontSize:12,color:"var(--sub)"}}> pt</span></div>
+            <button onClick={handleSubmit} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:14,borderRadius:14,fontSize:16,fontWeight:700,width:"100%",border:"none",cursor:"pointer"}}>{editId?"更新":"📚 記録する"}</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Wish Form */}
+      {showWishForm && <div>
+        <div onClick={function(){setShowWishForm(false)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",zIndex:100}} />
+        <div style={{position:"fixed",bottom:0,left:0,right:0,background:"var(--card)",borderRadius:"20px 20px 0 0",zIndex:101,padding:"28px 24px 40px"}}>
+          <h3 style={{fontSize:18,fontWeight:700,marginBottom:20}}>📌 積読に追加</h3>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            <input placeholder="タイトル" onChange={function(e){}} id="wish-title" style={{width:"100%"}} />
+            <button onClick={function(){var t=document.getElementById("wish-title").value;if(!t.trim())return;saveWish(wishlist.concat([{id:Date.now().toString(),title:t,category:"本",member:members[0]}]));document.getElementById("wish-title").value="";setShowWishForm(false)}} style={{background:"linear-gradient(135deg,#007AFF,#5856D6)",color:"#fff",padding:14,borderRadius:14,fontSize:16,fontWeight:700,width:"100%",border:"none",cursor:"pointer"}}>📌 追加</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Settings */}
+      {showSettings && <div>
+        <div onClick={function(){setShowSettings(false)}} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(12px)",zIndex:100}} />
+        <div style={{position:"fixed",bottom:0,left:0,right:0,maxHeight:"92vh",background:"var(--card)",borderRadius:"20px 20px 0 0",zIndex:101,overflowY:"auto",padding:"28px 24px 40px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:24}}>
+            <h3 style={{fontSize:18,fontWeight:700}}>⚙️ 設定</h3>
+            <button onClick={function(){setShowSettings(false)}} style={{background:"var(--bb)",width:32,height:32,borderRadius:16,fontSize:14,border:"none",cursor:"pointer",color:"var(--sub)"}}>✕</button>
+          </div>
+          <div style={{marginBottom:20}}>
+            <label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>アプリ名</label>
+            <input value={config.appName} onChange={function(e){saveConfig(Object.assign({},config,{appName:e.target.value}))}} style={{width:"100%"}} />
+          </div>
+          <div>
+            <label style={{fontSize:13,fontWeight:600,color:"var(--sub)",display:"block",marginBottom:6}}>メンバー</label>
+            {members.map(function(m,i){return (
+              <div key={m} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:"var(--card2)",borderRadius:12,marginBottom:8}}>
+                <div style={{width:24,height:24,borderRadius:12,background:PALETTE[i%PALETTE.length],display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff"}}>{getMI(m)}</div>
+                <span style={{flex:1,fontSize:14,fontWeight:600}}>{m}</span>
+                <button onClick={function(){if(confirm(m+"を削除？"))saveConfig(Object.assign({},config,{members:members.filter(function(x){return x!==m})}))}} style={{background:"none",color:"#FF3B30",fontSize:12,fontWeight:600,border:"none",cursor:"pointer"}}>削除</button>
+              </div>
+            )})}
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <input value={newMember} onChange={function(e){setNewMember(e.target.value)}} onKeyDown={function(e){if(e.key==="Enter"){if(newMember.trim()&&members.indexOf(newMember.trim())<0){saveConfig(Object.assign({},config,{members:members.concat([newMember.trim()])}));setNewMember("")}}}} placeholder="新メンバー名" style={{flex:1}} />
+              <button onClick={function(){if(newMember.trim()&&members.indexOf(newMember.trim())<0){saveConfig(Object.assign({},config,{members:members.concat([newMember.trim()])}));setNewMember("")}}} style={{background:"#007AFF",color:"#fff",padding:"8px 16px",borderRadius:10,fontSize:13,fontWeight:600,border:"none",cursor:"pointer"}}>追加</button>
+            </div>
+          </div>
+          <div style={{marginTop:20,padding:14,background:"var(--card2)",borderRadius:12,fontSize:12,color:"var(--sub)",lineHeight:1.6}}>
+            <strong>称号一覧:</strong><br />{TITLES.map(function(t){return t.emoji+t.name+"("+t.min+"pt)"}).join(" → ")}
+          </div>
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
